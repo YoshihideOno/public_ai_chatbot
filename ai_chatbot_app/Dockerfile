@@ -11,11 +11,10 @@ COPY package*.json ./
 RUN npm install
 
 # アプリケーションのソースコードをコピー
-# アプリケーションのソースコードをコピー
 COPY . .
 
 # Next.jsアプリケーションをビルド
 RUN npm run build
 
-# アプリケーションを起動
-CMD ["npm", "run", "dev"]
+# アプリケーションを起動（本番）
+CMD ["npm", "run", "start"]
