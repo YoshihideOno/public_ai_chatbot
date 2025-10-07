@@ -54,17 +54,21 @@ http://localhost:3000
 
 ```
 ai_chatbot_project/
-├── ai_chatbot_app/          # Next.jsアプリケーション
-│   ├── app/                # App Router
-│   │   ├── about/          # アプリについてページ
-│   │   ├── contact/        # お問い合わせページ
-│   │   ├── layout.tsx      # ルートレイアウト
-│   │   └── page.tsx        # ホームページ
-│   ├── components/         # Reactコンポーネント
-│   ├── public/            # 静的ファイル
-│   └── package.json       # 依存関係
-├── docker-compose.yml      # Docker設定
-└── README.md              # このファイル
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions設定
+├── ai_chatbot_app/             # Next.jsアプリケーション
+│   ├── app/                    # App Router
+│   ├── components/             # Reactコンポーネント
+│   ├── public/                 # 静的ファイル
+│   ├── .gitignore             # Next.js用gitignore
+│   ├── Dockerfile              # Docker設定
+│   ├── package.json            # 依存関係
+│   └── tsconfig.json           # TypeScript設定
+├── .gitignore                  # プロジェクト全体のgitignore
+├── docker-compose.yml          # Docker Compose設定
+├── env.example                 # 環境変数テンプレート
+└── README.md                   # プロジェクト説明
 ```
 
 ## 🔧 開発
