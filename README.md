@@ -9,6 +9,8 @@ Next.js 15とPostgreSQLを使用したAIチャットボットアプリケーシ�
 - **バックエンド**: Node.js 20, PostgreSQL 13
 - **コンテナ**: Docker, Docker Compose
 - **開発環境**: Turbopack
+- **CI/CD**: GitHub Actions, AWS CodePipeline
+- **クラウド**: AWS (ECS, RDS, ECR, ALB)
 
 ## 📋 機能
 
@@ -56,6 +58,7 @@ http://localhost:3000
 ai_chatbot_project/
 ├── .github/
 │   └── workflows/
+│       ├── ci.yml              # GitHub Actions設定
 │       └── ci.yml              # GitHub Actions設定
 ├── ai_chatbot_app/             # Next.jsアプリケーション
 │   ├── app/                    # App Router
@@ -68,6 +71,7 @@ ai_chatbot_project/
 ├── .gitignore                  # プロジェクト全体のgitignore
 ├── docker-compose.yml          # Docker Compose設定
 ├── env.example                 # 環境変数テンプレート
+├── vercel.json                 # Vercel設定
 └── README.md                   # プロジェクト説明
 ```
 

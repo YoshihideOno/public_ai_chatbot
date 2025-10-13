@@ -23,8 +23,8 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     # ローカル開発でDBへ外部接続が必要な場合のみ、以下をoverrideファイルで有効化
-    # ports:
-    #   - "5432:5432"
+    ports:
+      - "5432:5432"
 
 volumes:
   db-data:
