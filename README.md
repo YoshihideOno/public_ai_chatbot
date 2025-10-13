@@ -6,11 +6,12 @@ Next.js 15とPostgreSQLを使用したAIチャットボットアプリケーシ�
 
 - **フロントエンド**: Next.js 15.5.4, React 19.1.0, TypeScript
 - **スタイリング**: Tailwind CSS, Material-UI
-- **バックエンド**: Node.js 20, PostgreSQL 13
+- **バックエンド**: Node.js 20, PostgreSQL 17
 - **コンテナ**: Docker, Docker Compose
 - **開発環境**: Turbopack
-- **CI/CD**: GitHub Actions, AWS CodePipeline
-- **クラウド**: AWS (ECS, RDS, ECR, ALB)
+- **CI/CD**: GitHub Actions
+- **デプロイ**: Vercel
+- **データベース**: Neon (PostgreSQL)
 
 ## 📋 機能
 
@@ -58,7 +59,6 @@ http://localhost:3000
 ai_chatbot_project/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml              # GitHub Actions設定
 │       └── ci.yml              # GitHub Actions設定
 ├── ai_chatbot_app/             # Next.jsアプリケーション
 │   ├── app/                    # App Router
@@ -105,6 +105,22 @@ docker-compose logs -f nextjs-app
 | `DATABASE_URL` | PostgreSQL接続URL | `postgresql://user:password@db:5432/ai_chatbot_db` |
 | `NODE_ENV` | 実行環境 | `development` |
 | `NEXT_PUBLIC_APP_NAME` | アプリケーション名 | `AI Chatbot` |
+
+## ☁️ デプロイメント
+
+### Vercel + Neon構成
+- **フロントエンド**: Vercel
+- **データベース**: Neon (PostgreSQL)
+- **CI/CD**: GitHub Actions
+
+### デプロイ手順
+1. GitHubにコードをプッシュ
+2. Vercelが自動的にビルド・デプロイ
+3. Neonデータベースに接続
+
+### 環境変数設定
+- VercelプロジェクトのSettings → Environment Variables
+- `DATABASE_URL` にNeonの接続文字列を設定
 
 ## 📝 ライセンス
 
