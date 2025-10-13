@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "cd ai_chatbot_app && npm run dev",
     "build": "cd ai_chatbot_app && npm run build",
-    "start": "cd ai_chatbot_app && npm run start",
-    "install": "cd ai_chatbot_app && npm install"
+    "start": "cd ai_chatbot_app && npm run start"
   },
   "workspaces": [
     "ai_chatbot_app"
