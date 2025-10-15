@@ -24,7 +24,7 @@ python-dotenv==1.0.1
 
 # External integrations
 stripe==7.13.0
-resend==0.10.0
+resend==2.17.0
 
 # Development
 pytest==8.3.4
