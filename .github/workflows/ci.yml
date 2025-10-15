@@ -113,6 +113,9 @@ jobs:
         cd ai_chatbot_app
         docker build -t ai-chatbot-app .
     
+    - name: Prepare env file
+      run: cp env.example .env.local || touch .env.local
+    
     - name: Test Docker Compose
       run: |
         docker compose version
