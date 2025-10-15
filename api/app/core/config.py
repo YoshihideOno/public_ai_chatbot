@@ -15,7 +15,6 @@ Pydantic Settingsを使用して環境変数から設定値を読み込み、型
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 import os
-from app.utils.logging import BusinessLogger
 
 
 class Settings(BaseSettings):
@@ -104,6 +103,8 @@ class Settings(BaseSettings):
             if not self.SECRET_KEY or self.SECRET_KEY == "your-secret-key-change-in-production":
                 if self.ENVIRONMENT == "production":
                     raise ValueError("本番環境ではSECRET_KEYを設定してください")
+                # 遅延インポートで循環インポートを回避
+                from app.utils.logging import BusinessLogger
                 BusinessLogger.warning("デフォルトのSECRET_KEYが使用されています")
             
             # データベースURLのチェック
@@ -112,6 +113,8 @@ class Settings(BaseSettings):
             
             # CORS設定のチェック
             if not self.BACKEND_CORS_ORIGINS:
+                # 遅延インポートで循環インポートを回避
+                from app.utils.logging import BusinessLogger
                 BusinessLogger.warning("CORS設定が空です")
 
             # Stripe/Resendの本番必須設定
@@ -123,10 +126,14 @@ class Settings(BaseSettings):
                 if not self.APP_URL:
                     raise ValueError("APP_URLが設定されていません")
             
+            # 遅延インポートで循環インポートを回避
+            from app.utils.logging import BusinessLogger
             BusinessLogger.info(f"設定バリデーション完了: {self.ENVIRONMENT}環境")
             return True
             
         except Exception as e:
+            # 遅延インポートで循環インポートを回避
+            from app.utils.logging import BusinessLogger
             BusinessLogger.error(f"設定バリデーションエラー: {str(e)}")
             raise
 
@@ -138,5 +145,7 @@ settings = Settings()
 try:
     settings.validate_settings()
 except Exception as e:
+    # 遅延インポートで循環インポートを回避
+    from app.utils.logging import BusinessLogger
     BusinessLogger.error(f"設定初期化エラー: {str(e)}")
     raise
