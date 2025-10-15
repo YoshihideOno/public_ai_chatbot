@@ -93,8 +93,9 @@ export function UsersList() {
       
       setUsers(usersData);
       setTotalPages(Math.ceil(usersData.length / itemsPerPage));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch users:', err);
+      const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
       setError('ユーザー一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
@@ -125,7 +126,7 @@ export function UsersList() {
     try {
       await apiClient.deleteUser(userId);
       setUsers(users.filter(user => user.id !== userId));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete user:', err);
       setError('ユーザーの削除に失敗しました');
     }
