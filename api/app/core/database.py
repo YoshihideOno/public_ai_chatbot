@@ -18,7 +18,6 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
-from app.utils.logging import BusinessLogger
 import logging
 
 # Create async engine
@@ -58,7 +57,7 @@ async def get_db() -> AsyncSession:
         try:
             yield session
         except Exception as e:
-            BusinessLogger.error(f"データベースセッションエラー: {str(e)}")
+            logging.error(f"データベースセッションエラー: {str(e)}")
             await session.rollback()
             raise
         finally:
@@ -81,7 +80,7 @@ async def init_db():
             # Import all models here to ensure they are registered
             from app.models import user, chat, tenant, file, chunk  # noqa
             await conn.run_sync(Base.metadata.create_all)
-            BusinessLogger.info("データベーステーブルの初期化が完了しました")
+            logging.info("データベーステーブルの初期化が完了しました")
     except Exception as e:
-        BusinessLogger.error(f"データベース初期化エラー: {str(e)}")
+        logging.error(f"データベース初期化エラー: {str(e)}")
         raise
