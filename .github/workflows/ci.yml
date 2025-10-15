@@ -74,10 +74,18 @@ jobs:
         cache: 'pip'
         cache-dependency-path: api/requirements.txt
     
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('api/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
     - name: Install dependencies
       run: |
         cd api
-        pip install --no-cache-dir -r requirements.txt
+        pip install -r requirements.txt
     
     - name: Run database migrations
       run: |
