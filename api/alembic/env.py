@@ -1,6 +1,6 @@
 from __future__ import annotations
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, create_engine
 from alembic import context
 import os
 import sys
@@ -22,6 +22,11 @@ target_metadata = Base.metadata
 def run_migrations_offline():
     # 環境変数からDATABASE_URLを取得、なければalembic.iniから取得
     url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    
+    # asyncpg URLをpsycopg2 URLに変換（Alembicは同期処理のため）
+    if url and "postgresql+asyncpg://" in url:
+        url = url.replace("postgresql+asyncpg://", "postgresql://")
+    
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -36,13 +41,13 @@ def run_migrations_online():
     # 環境変数からDATABASE_URLを取得、なければalembic.iniから取得
     url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
     
-    # 設定を更新
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = url
+    # asyncpg URLをpsycopg2 URLに変換（Alembicは同期処理のため）
+    if url and "postgresql+asyncpg://" in url:
+        url = url.replace("postgresql+asyncpg://", "postgresql://")
     
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    # 同期エンジンを作成
+    connectable = create_engine(
+        url,
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
