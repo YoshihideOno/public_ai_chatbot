@@ -1,139 +1,136 @@
-# AIチャットボットプロジェクト
+## RAG AI プラットフォーム（マイクロサービス）
 
-Next.js 15とPostgreSQLを使用したAIチャットボットアプリケーションです。
+本リポジトリは、RAG（Retrieval-Augmented Generation）方式のAIチャットボットプラットフォームです。マイクロサービス指向、マルチテナント、セキュリティファーストを重視し、フロントエンド（Next.js）とバックエンド（FastAPI）で構成されています。
 
-## 🚀 技術スタック
+### 🚀 技術スタック
 
-- **フロントエンド**: Next.js 15.5.4, React 19.1.0, TypeScript
-- **スタイリング**: Tailwind CSS, Material-UI
-- **バックエンド**: Node.js 20, PostgreSQL 17
-- **コンテナ**: Docker, Docker Compose
-- **開発環境**: Turbopack
+- **フロントエンド**: Next.js 15, React 18+, TypeScript, Tailwind CSS, shadcn/ui, React Hook Form + Zod
+- **バックエンド**: Python 3.11+, FastAPI, PostgreSQL + pgvector, Redis
+- **インフラ**: Docker, Docker Compose, Vercel, Neon
 - **CI/CD**: GitHub Actions
-- **デプロイ**: Vercel
-- **データベース**: Neon (PostgreSQL)
 
-## 📋 機能
-
-- ✅ レスポンシブなWebインターフェース
-- ✅ アプリケーション情報ページ
-- ✅ お問い合わせフォーム
-- 🔄 AIチャットボット機能（開発中）
-- 🔄 データベース連携（開発中）
-
-## 🛠️ セットアップ
-
-### 前提条件
-
-- Docker & Docker Compose
-- Node.js 20+ (ローカル開発時)
-
-### インストール
-
-1. リポジトリをクローン
-```bash
-git clone https://github.com/YOUR_USERNAME/ai_chatbot_project.git
-cd ai_chatbot_project
-```
-
-2. 環境変数を設定
-```bash
-# .env.local ファイルを作成
-cp .env.example .env.local
-# 必要に応じて値を編集
-```
-
-3. Docker Composeで起動
-```bash
-docker-compose up -d
-```
-
-4. アプリケーションにアクセス
-```
-http://localhost:3000
-```
-
-## 📁 プロジェクト構造
+### 📁 ディレクトリ構成（抜粋）
 
 ```
 ai_chatbot_project/
-├── .github/
-│   └── workflows/
-│       └── ci.yml              # GitHub Actions設定
-├── ai_chatbot_app/             # Next.jsアプリケーション
-│   ├── app/                    # App Router
-│   ├── components/             # Reactコンポーネント
-│   ├── public/                 # 静的ファイル
-│   ├── .gitignore             # Next.js用gitignore
-│   ├── Dockerfile              # Docker設定
-│   ├── package.json            # 依存関係
-│   └── tsconfig.json           # TypeScript設定
-├── .gitignore                  # プロジェクト全体のgitignore
-├── docker-compose.yml          # Docker Compose設定
-├── env.example                 # 環境変数テンプレート
-├── vercel.json                 # Vercel設定
-└── README.md                   # プロジェクト説明
+├── api/                       # FastAPI バックエンド
+│   └── app/
+│       ├── api/               # APIエンドポイント
+│       ├── core/              # 設定・セキュリティ
+│       ├── services/          # ドメインサービス
+│       └── utils/             # 共通ユーティリティ
+├── frontend/                  # Next.js フロントエンド
+│   ├── app/
+│   ├── components/
+│   └── tsconfig.json
+├── docker-compose.yml         # ローカル開発用（あれば）
+└── README.md
 ```
 
-## 🔧 開発
+---
 
-### ローカル開発
+## 機能概要
+
+- **AIチャット**: RAG による文書検索と生成
+- **マルチテナント**: テナント毎にデータを分離
+- **認証/認可**: JWT + OAuth2、RBAC（Role-Based Access Control）
+- **観測性**: 構造化ログ、メトリクス、トレーシング
+
+---
+
+## 🛠 セットアップ
+
+### 前提条件
+
+- Docker & Docker Compose（推奨）
+- Node.js 20+（フロントエンド開発時）
+- Python 3.11+（バックエンドローカル実行時）
+
+### リポジトリ取得
 
 ```bash
-cd ai_chatbot_app
+git clone https://github.com/YOUR_ORG/ai_chatbot_project.git
+cd ai_chatbot_project
+```
+
+### 環境変数
+
+- ルート、`api/`、`frontend/` それぞれにサンプルを用意してください（例: `.env.example` → `.env`/`.env.local`）。
+- 代表例（値は環境に合わせて設定）
+
+| 変数名 | 用途 |
+|---|---|
+| `DATABASE_URL` | PostgreSQL 接続（pgvector 拡張有）|
+| `REDIS_URL` | セッション/キャッシュ用 Redis |
+| `JWT_SECRET` | 認証用シークレット |
+| `NEXT_PUBLIC_APP_NAME` | フロントのアプリ名 |
+
+---
+
+## ▶ ローカル実行
+
+### 1) バックエンド（FastAPI）
+
+```bash
+cd api
+pip install -r requirements.txt  # または Poetry 等
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+- OpenAPI: `http://localhost:8000/docs`
+
+### 2) フロントエンド（Next.js）
+
+```bash
+cd frontend
 npm install
 npm run dev
 ```
 
-### Docker開発
+- Web: `http://localhost:3000`
+
+### 3) Docker で一括起動（任意）
 
 ```bash
-# 開発環境で起動
-docker-compose up
-
-# バックグラウンドで起動
-docker-compose up -d
-
-# ログを確認
-docker-compose logs -f nextjs-app
+docker compose up -d
 ```
 
-## 🌐 環境変数
+---
 
-| 変数名 | 説明 | デフォルト |
-|--------|------|------------|
-| `DATABASE_URL` | PostgreSQL接続URL | `postgresql://user:password@db:5432/ai_chatbot_db` |
-| `NODE_ENV` | 実行環境 | `development` |
-| `NEXT_PUBLIC_APP_NAME` | アプリケーション名 | `AI Chatbot` |
+## セキュリティ/品質（抜粋）
 
-## ☁️ デプロイメント
+- 入力バリデーション: Pydantic（API）/ Zod（UI）
+- 認証/認可: JWT + OAuth2、RBAC
+- CSRF/XSS/SQLインジェクション対策: フレームワーク/ミドルウェアで実装
+- レート制限: 重要エンドポイントに適用（今後強化）
+- ログ/監視: JSON 構造化ログ、Prometheus 形式メトリクス、OpenTelemetry トレース
 
-### Vercel + Neon構成
-- **フロントエンド**: Vercel
-- **データベース**: Neon (PostgreSQL)
-- **CI/CD**: GitHub Actions
+---
 
-### デプロイ手順
-1. GitHubにコードをプッシュ
-2. Vercelが自動的にビルド・デプロイ
-3. Neonデータベースに接続
+## テスト
 
-### 環境変数設定
-- VercelプロジェクトのSettings → Environment Variables
-- `DATABASE_URL` にNeonの接続文字列を設定
+- 単体/統合/E2E を段階的に整備（目標カバレッジ 80%+）
 
-## 📝 ライセンス
+---
 
-このプロジェクトはMITライセンスの下で公開されています。
+## デプロイ（概要）
 
-## 🤝 コントリビューション
+- CI/CD: GitHub Actions
+- フロントエンド: Vercel
+- データベース: Neon (PostgreSQL + pgvector)
+- バックエンド: 別途ホスティング（要検討）
 
-1. このリポジトリをフォーク
-2. フィーチャーブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
+---
 
-## 📞 サポート
+## コントリビューション
 
-質問や問題がある場合は、[Issues](https://github.com/YOUR_USERNAME/ai_chatbot_project/issues)でお知らせください。
+1. リポジトリをフォーク
+2. ブランチ作成: `feat/...` `fix/...`
+3. コミット規約に従う（例: `feat(auth): JWT認証を追加`）
+4. PR 作成
+
+---
+
+## ライセンス
+
+MIT

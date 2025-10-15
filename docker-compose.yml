@@ -14,9 +14,26 @@ services:
     command: sh -c "npm install && npm run dev"
     depends_on:
       - db
+      - fastapi
+
+  fastapi:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    env_file:
+      - ./.env.local
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ai_chatbot_db
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - db
 
   db:
-    image: postgres:17
+    image: pgvector/pgvector:pg17
     restart: always
     env_file:
       - ./.env.local
