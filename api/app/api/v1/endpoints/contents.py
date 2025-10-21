@@ -7,6 +7,7 @@ from app.schemas.content import (
     Chunk, ChunkCreate, ChunkUpdate, ContentSearchParams,
     ContentSearchResult
 )
+from app.schemas.user import User
 from app.services.content_service import ContentService
 from app.api.v1.deps import (
     get_current_user, 

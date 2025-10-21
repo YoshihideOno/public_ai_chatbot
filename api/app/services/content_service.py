@@ -93,10 +93,6 @@ class ContentService:
         except Exception as e:
             BusinessLogger.error(f"コンテンツ取得エラー: {str(e)}")
             raise
-                    File.deleted_at.is_(None)
-                )
-            )
-        )
         return result.scalar_one_or_none()
 
     async def get_all_contents(

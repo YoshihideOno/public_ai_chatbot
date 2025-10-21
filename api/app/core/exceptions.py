@@ -71,7 +71,7 @@ class AuthenticationError(CustomHTTPException):
     401 Unauthorizedステータスコードを返し、認証が必要であることを示します。
     """
     
-    def __init__(self, detail: str = "Authentication failed"):
+    def __init__(self, detail: str = "認証に失敗しました"):
         """
         認証エラーの初期化
         
@@ -98,7 +98,7 @@ class AuthorizationError(CustomHTTPException):
     403 Forbiddenステータスコードを返し、アクセス権限がないことを示します。
     """
     
-    def __init__(self, detail: str = "Insufficient permissions"):
+    def __init__(self, detail: str = "権限が不足しています"):
         """
         認可エラーの初期化
         
@@ -124,7 +124,7 @@ class ValidationError(CustomHTTPException):
     422 Unprocessable Entityステータスコードを返し、入力値が無効であることを示します。
     """
     
-    def __init__(self, detail: str = "Validation failed", error_details: Optional[Dict[str, Any]] = None):
+    def __init__(self, detail: str = "バリデーションに失敗しました", error_details: Optional[Dict[str, Any]] = None):
         """
         バリデーションエラーの初期化
         
@@ -164,7 +164,7 @@ class ResourceNotFoundError(CustomHTTPException):
         """
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{resource} not found",
+            detail=f"{resource} が見つかりません",
             error_code="RESOURCE_NOT_FOUND"
         )
         BusinessLogger.info(f"リソース未発見: {resource}")
@@ -178,7 +178,7 @@ class ConflictError(CustomHTTPException):
     409 Conflictステータスコードを返します。
     """
     
-    def __init__(self, detail: str = "Resource conflict"):
+    def __init__(self, detail: str = "リソースの競合が発生しました"):
         """
         競合エラーの初期化
         
@@ -204,7 +204,7 @@ class RateLimitError(CustomHTTPException):
     429 Too Many Requestsステータスコードを返します。
     """
     
-    def __init__(self, detail: str = "Rate limit exceeded"):
+    def __init__(self, detail: str = "レート制限を超過しました"):
         """
         レート制限エラーの初期化
         
@@ -230,7 +230,7 @@ class BusinessLogicError(CustomHTTPException):
     422 Unprocessable Entityステータスコードを返します。
     """
     
-    def __init__(self, detail: str = "Business logic error"):
+    def __init__(self, detail: str = "ビジネスロジックエラーが発生しました"):
         """
         ビジネスロジックエラーの初期化
         
@@ -263,7 +263,7 @@ class UserNotFoundError(ResourceNotFoundError):
         戻り値:
             UserNotFoundError: ユーザー未発見エラーインスタンス
         """
-        super().__init__("User")
+        super().__init__("ユーザー")
 
 
 class TenantNotFoundError(ResourceNotFoundError):
@@ -280,7 +280,24 @@ class TenantNotFoundError(ResourceNotFoundError):
         戻り値:
             TenantNotFoundError: テナント未発見エラーインスタンス
         """
-        super().__init__("Tenant")
+        super().__init__("テナント")
+
+
+class ApiKeyNotFoundError(ResourceNotFoundError):
+    """
+    APIキー未発見エラークラス
+    
+    APIキーが存在しない場合のエラーを処理します。
+    """
+    
+    def __init__(self):
+        """
+        APIキー未発見エラーの初期化
+        
+        戻り値:
+            ApiKeyNotFoundError: APIキー未発見エラーインスタンス
+        """
+        super().__init__("APIキー")
 
 
 class EmailAlreadyExistsError(ConflictError):
@@ -297,7 +314,7 @@ class EmailAlreadyExistsError(ConflictError):
         戻り値:
             EmailAlreadyExistsError: メールアドレス重複エラーインスタンス
         """
-        super().__init__("Email already registered")
+        super().__init__("メールアドレスは既に登録されています")
 
 
 class UsernameAlreadyExistsError(ConflictError):
@@ -314,7 +331,7 @@ class UsernameAlreadyExistsError(ConflictError):
         戻り値:
             UsernameAlreadyExistsError: ユーザー名重複エラーインスタンス
         """
-        super().__init__("Username already taken")
+        super().__init__("ユーザー名は既に使用されています")
 
 
 class InvalidCredentialsError(AuthenticationError):
@@ -331,7 +348,7 @@ class InvalidCredentialsError(AuthenticationError):
         戻り値:
             InvalidCredentialsError: 無効な認証情報エラーインスタンス
         """
-        super().__init__("Incorrect email or password")
+        super().__init__("メールアドレスまたはパスワードが正しくありません")
 
 
 class InactiveUserError(AuthenticationError):
@@ -348,7 +365,7 @@ class InactiveUserError(AuthenticationError):
         戻り値:
             InactiveUserError: 非アクティブユーザーエラーインスタンス
         """
-        super().__init__("Inactive user")
+        super().__init__("ユーザーアカウントが無効化されています")
 
 
 class TokenExpiredError(AuthenticationError):
@@ -365,7 +382,7 @@ class TokenExpiredError(AuthenticationError):
         戻り値:
             TokenExpiredError: トークン期限切れエラーインスタンス
         """
-        super().__init__("Token has expired")
+        super().__init__("トークンの有効期限が切れています")
 
 
 class InvalidTokenError(AuthenticationError):
@@ -382,7 +399,7 @@ class InvalidTokenError(AuthenticationError):
         戻り値:
             InvalidTokenError: 無効なトークンエラーインスタンス
         """
-        super().__init__("Invalid token")
+        super().__init__("無効なトークンです")
 
 
 class InsufficientPermissionsError(AuthorizationError):
@@ -399,7 +416,7 @@ class InsufficientPermissionsError(AuthorizationError):
         戻り値:
             InsufficientPermissionsError: 権限不足エラーインスタンス
         """
-        super().__init__("Not enough permissions")
+        super().__init__("権限が不足しています")
 
 
 class TenantAccessDeniedError(AuthorizationError):
@@ -416,7 +433,7 @@ class TenantAccessDeniedError(AuthorizationError):
         戻り値:
             TenantAccessDeniedError: テナントアクセス拒否エラーインスタンス
         """
-        super().__init__("Access denied to tenant resources")
+        super().__init__("テナントリソースへのアクセスが拒否されました")
 
 
 class PasswordValidationError(ValidationError):
@@ -436,7 +453,7 @@ class PasswordValidationError(ValidationError):
         戻り値:
             PasswordValidationError: パスワードバリデーションエラーインスタンス
         """
-        super().__init__("Password validation failed", details)
+        super().__init__("パスワードのバリデーションに失敗しました", details)
 
 
 class EmailValidationError(ValidationError):
@@ -456,4 +473,4 @@ class EmailValidationError(ValidationError):
         戻り値:
             EmailValidationError: メールアドレスバリデーションエラーインスタンス
         """
-        super().__init__("Email validation failed", details)
+        super().__init__("メールアドレスのバリデーションに失敗しました", details)

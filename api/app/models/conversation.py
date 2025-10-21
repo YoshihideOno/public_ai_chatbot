@@ -21,4 +21,4 @@ class Conversation(Base):
     feedback_comment = Column(Text, nullable=True)
     ip_address = Column(INET, nullable=True)
     user_agent = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

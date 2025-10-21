@@ -25,7 +25,7 @@ from app.core.exceptions import (
     UserNotFoundError, EmailAlreadyExistsError, UsernameAlreadyExistsError,
     ValidationError, BusinessLogicError
 )
-from app.utils.logging import BusinessLogger, SecurityLogger
+from app.utils.logging import SecurityLogger, ErrorLogger, logger
 from app.utils.common import ValidationUtils
 
 
@@ -65,8 +65,9 @@ class UserService:
             SQLAlchemyError: データベースエラー
         """
         try:
-            if not user_id or user_id <= 0:
-                BusinessLogger.warning(f"無効なユーザーID: {user_id}")
+            # UUID等の非整数IDも考慮し、存在チェックのみに留める
+            if not user_id:
+                logger.warning(f"無効なユーザーID: {user_id}")
                 return None
                 
             result = await self.db.execute(
@@ -77,13 +78,13 @@ class UserService:
             user = result.scalar_one_or_none()
             
             if user:
-                BusinessLogger.info(f"ユーザー取得成功: ID {user_id}")
+                logger.info(f"ユーザー取得成功: ID {user_id}")
             else:
-                BusinessLogger.info(f"ユーザー未発見: ID {user_id}")
+                logger.info(f"ユーザー未発見: ID {user_id}")
                 
             return user
         except Exception as e:
-            BusinessLogger.error(f"ユーザー取得エラー: {str(e)}")
+            logger.error(f"ユーザー取得エラー: {str(e)}")
             raise
 
     async def get_by_email(self, email: str) -> Optional[User]:
@@ -100,8 +101,8 @@ class UserService:
             SQLAlchemyError: データベースエラー
         """
         try:
-            if not email or not ValidationUtils.is_valid_email(email):
-                BusinessLogger.warning(f"無効なメールアドレス: {email}")
+            if not email or not ValidationUtils.validate_email(email):
+                logger.warning(f"無効なメールアドレス: {email}")
                 return None
                 
             result = await self.db.execute(
@@ -112,13 +113,15 @@ class UserService:
             user = result.scalar_one_or_none()
             
             if user:
-                BusinessLogger.info(f"ユーザー取得成功: メール {email}")
+                logger.info(
+                    f"ユーザー操作: user_id={user.id}, action=get_by_email, resource=user, tenant_id={user.tenant_id}"
+                )
             else:
-                BusinessLogger.info(f"ユーザー未発見: メール {email}")
+                logger.info(f"ユーザー未発見: メール {email}")
                 
             return user
         except Exception as e:
-            BusinessLogger.error(f"メール検索エラー: {str(e)}")
+            ErrorLogger.log_exception(e, {"operation": "get_by_email", "email": email})
             raise
 
     async def get_by_username(self, username: str) -> Optional[User]:
@@ -135,8 +138,8 @@ class UserService:
             SQLAlchemyError: データベースエラー
         """
         try:
-            if not username or not ValidationUtils.is_valid_username(username):
-                BusinessLogger.warning(f"無効なユーザー名: {username}")
+            if not username or len(username) < 3 or len(username) > 20:
+                logger.warning(f"無効なユーザー名: {username}")
                 return None
                 
             result = await self.db.execute(
@@ -147,13 +150,15 @@ class UserService:
             user = result.scalar_one_or_none()
             
             if user:
-                BusinessLogger.info(f"ユーザー取得成功: ユーザー名 {username}")
+                logger.info(
+                    f"ユーザー操作: user_id={user.id}, action=get_by_username, resource=user, tenant_id={user.tenant_id}"
+                )
             else:
-                BusinessLogger.info(f"ユーザー未発見: ユーザー名 {username}")
+                logger.info(f"ユーザー未発見: ユーザー名 {username}")
                 
             return user
         except Exception as e:
-            BusinessLogger.error(f"ユーザー名検索エラー: {str(e)}")
+            ErrorLogger.log_exception(e, {"operation": "get_by_username", "username": username})
             raise
 
     async def get_all_users(self, skip: int = 0, limit: int = 100) -> List[User]:
@@ -182,10 +187,10 @@ class UserService:
             )
             users = result.scalars().all()
             
-            BusinessLogger.info(f"ユーザー一覧取得成功: {len(users)}件")
+            logger.info(f"ユーザー一覧取得成功: {len(users)}件")
             return users
         except Exception as e:
-            BusinessLogger.error(f"ユーザー一覧取得エラー: {str(e)}")
+            logger.error(f"ユーザー一覧取得エラー: {str(e)}")
             raise
 
     async def get_users_by_tenant(self, tenant_id: str, skip: int = 0, limit: int = 100) -> List[User]:
@@ -219,10 +224,10 @@ class UserService:
             )
             users = result.scalars().all()
             
-            BusinessLogger.info(f"テナントユーザー一覧取得成功: テナント {tenant_id}, {len(users)}件")
+            logger.info(f"テナントユーザー一覧取得成功: テナント {tenant_id}, {len(users)}件")
             return users
         except Exception as e:
-            BusinessLogger.error(f"テナントユーザー一覧取得エラー: {str(e)}")
+            logger.error(f"テナントユーザー一覧取得エラー: {str(e)}")
             raise
 
     async def create_user(self, user_data: UserCreate) -> User:
@@ -242,25 +247,43 @@ class UserService:
         """
         try:
             # 入力値のバリデーション
-            if not ValidationUtils.is_valid_email(user_data.email):
+            if not ValidationUtils.validate_email(user_data.email):
                 raise ValidationError("無効なメールアドレス形式です")
                 
-            if not ValidationUtils.is_valid_password(user_data.password):
-                raise ValidationError("パスワードは8文字以上で、英数字と記号を含む必要があります")
+            password_validation = ValidationUtils.validate_password_strength(user_data.password)
+            if not password_validation['is_valid']:
+                raise ValidationError("パスワードは8文字以上で、大文字、小文字、数字を含む必要があります")
                 
-            if not ValidationUtils.is_valid_username(user_data.username):
+            if not user_data.username or len(user_data.username) < 3 or len(user_data.username) > 20:
                 raise ValidationError("ユーザー名は3-20文字の英数字とアンダースコアのみ使用可能です")
             
-            # 重複チェック
-            existing_email = await self.get_by_email(user_data.email)
-            if existing_email:
-                SecurityLogger.warning(f"メールアドレス重複試行: {user_data.email}")
-                raise EmailAlreadyExistsError()
-                
-            existing_username = await self.get_by_username(user_data.username)
-            if existing_username:
-                SecurityLogger.warning(f"ユーザー名重複試行: {user_data.username}")
-                raise UsernameAlreadyExistsError()
+            # 重複チェック（単一クエリで実行）
+            from sqlalchemy import or_
+            existing_user = await self.db.execute(
+                select(User).where(
+                    or_(
+                        User.email == user_data.email,
+                        User.username == user_data.username
+                    )
+                )
+            )
+            existing = existing_user.scalar_one_or_none()
+            
+            if existing:
+                if existing.email == user_data.email:
+                    SecurityLogger.log_suspicious_activity(
+                        None,
+                        "duplicate_email_registration",
+                        {"email": user_data.email}
+                    )
+                    raise EmailAlreadyExistsError()
+                else:
+                    SecurityLogger.log_suspicious_activity(
+                        None,
+                        "duplicate_username_registration",
+                        {"username": user_data.username}
+                    )
+                    raise UsernameAlreadyExistsError()
             
             # パスワードのハッシュ化
             hashed_password = get_password_hash(user_data.password)
@@ -277,33 +300,21 @@ class UserService:
             )
             
             self.db.add(user)
-            await self.db.commit()
+            # トランザクション内ではcommitしない
+            await self.db.flush()  # flushでIDを取得
             await self.db.refresh(user)
             
-            BusinessLogger.info(f"新規ユーザー作成完了: {user.email}")
+            logger.info(
+                f"ユーザー操作: user_id={user.id}, action=create_user, resource=user, tenant_id={user.tenant_id}"
+            )
             return user
             
         except (EmailAlreadyExistsError, UsernameAlreadyExistsError, ValidationError):
             raise
         except Exception as e:
             await self.db.rollback()
-            BusinessLogger.error(f"ユーザー作成エラー: {str(e)}")
+            ErrorLogger.log_exception(e, {"operation": "create_user"})
             raise
-        hashed_password = get_password_hash(user_data.password)
-        db_user = User(
-            email=user_data.email,
-            username=user_data.username,
-            hashed_password=hashed_password,
-            role=user_data.role,
-            tenant_id=user_data.tenant_id,
-        )
-        self.db.add(db_user)
-        await self.db.commit()
-        await self.db.refresh(db_user)
-        
-        # Load tenant information
-        await self.db.refresh(db_user, ['tenant'])
-        return db_user
 
     async def update_user(self, user_id: int, user_update: UserUpdate) -> Optional[User]:
         """Update user information"""

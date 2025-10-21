@@ -31,7 +31,7 @@ export function Layout({ children }: LayoutProps) {
           onClose={closeSidebar} 
         />
         
-        <main className="flex-1 p-6 md:ml-64">
+        <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>

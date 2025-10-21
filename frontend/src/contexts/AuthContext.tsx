@@ -68,6 +68,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('refresh_token', response.refresh_token);
       
       setUser(response.user);
+      
+      // ログイン成功後、ダッシュボードにリダイレクト
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -90,6 +93,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Logout failed:', error);
     } finally {
       setUser(null);
+      // トークンを削除
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      // ログアウト後、ランディングページにリダイレクト
+      window.location.href = '/';
     }
   };
 

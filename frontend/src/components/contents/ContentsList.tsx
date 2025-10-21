@@ -1,3 +1,17 @@
+/**
+ * コンテンツ一覧表示コンポーネント
+ * 
+ * ナレッジベースのコンテンツ一覧を表示し、検索・フィルタリング・
+ * ページネーション機能を提供する。管理者権限に応じて編集・削除機能も提供。
+ * 
+ * 機能:
+ * - コンテンツ一覧の表示
+ * - 検索・フィルタリング機能
+ * - ページネーション
+ * - コンテンツの編集・削除（権限に応じて）
+ * - 再インデックス機能
+ */
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -39,7 +53,6 @@ import {
   RefreshCw,
   Eye,
   File,
-  FileImage,
   FileSpreadsheet,
   FileCode,
   FileType
@@ -47,26 +60,44 @@ import {
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-export function ContentsList() {
+/**
+ * コンテンツ一覧表示コンポーネント
+ * @returns React.ReactElement コンテンツ一覧のUI
+ */
+export function ContentsList(): React.ReactElement {
+  // コンテンツ一覧の状態管理
   const [contents, setContents] = useState<Content[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // 検索・フィルタリングの状態管理
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [fileTypeFilter, setFileTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const itemsPerPage = 20;
+  
+  // ページネーションの状態管理
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const itemsPerPage: number = 20;
 
+  // 認証コンテキストから現在のユーザー情報を取得
   const { user: currentUser } = useAuth();
 
-  const fetchContents = async (page: number = 0) => {
+  /**
+   * コンテンツ一覧を取得する関数
+   * @param page ページ番号（デフォルト: 0）
+   * @returns Promise<void>
+   */
+  const fetchContents = React.useCallback(async (page: number = 0): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const skip = page * itemsPerPage;
-      const contentsData = await apiClient.getContents(
+      // ページネーション用のスキップ数を計算
+      const skip: number = page * itemsPerPage;
+      
+      // APIからコンテンツ一覧を取得
+      const contentsData: Content[] = await apiClient.getContents(
         skip, 
         itemsPerPage, 
         fileTypeFilter || undefined, 
@@ -74,46 +105,73 @@ export function ContentsList() {
         searchTerm || undefined
       );
       
+      // 状態を更新
       setContents(contentsData);
       setTotalPages(Math.ceil(contentsData.length / itemsPerPage));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // エラーログを出力
       console.error('Failed to fetch contents:', err);
       setError('コンテンツ一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fileTypeFilter, statusFilter, searchTerm]);
 
+  // コンテンツ一覧の取得を実行
   useEffect(() => {
     fetchContents(currentPage);
-  }, [currentPage, fileTypeFilter, statusFilter]);
+  }, [currentPage, fetchContents]);
 
-  const handleDeleteContent = async (contentId: string) => {
+  /**
+   * コンテンツを削除する関数
+   * @param contentId 削除するコンテンツのID
+   * @returns Promise<void>
+   */
+  const handleDeleteContent = async (contentId: string): Promise<void> => {
+    // 削除確認ダイアログを表示
     if (!confirm('このコンテンツを削除しますか？')) {
       return;
     }
 
     try {
+      // APIでコンテンツを削除
       await apiClient.deleteContent(contentId);
+      
+      // ローカル状態からも削除
       setContents(contents.filter(content => content.id !== contentId));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // エラーログを出力
       console.error('Failed to delete content:', err);
       setError('コンテンツの削除に失敗しました');
     }
   };
 
-  const handleReindexContent = async (contentId: string) => {
+  /**
+   * コンテンツの再インデックスを実行する関数
+   * @param contentId 再インデックスするコンテンツのID
+   * @returns Promise<void>
+   */
+  const handleReindexContent = async (contentId: string): Promise<void> => {
     try {
       // TODO: 再インデックスAPIを実装
+      console.log('Reindexing content:', contentId);
       alert('再インデックスが開始されました');
+      
+      // 一覧を再取得
       await fetchContents(currentPage);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // エラーログを出力
       console.error('Failed to reindex content:', err);
       setError('再インデックスの開始に失敗しました');
     }
   };
 
-  const getFileTypeIcon = (fileType: string) => {
+  /**
+   * ファイルタイプに応じたアイコンを取得する関数
+   * @param fileType ファイルタイプ
+   * @returns React.ReactElement 対応するアイコン
+   */
+  const getFileTypeIcon = (fileType: string): React.ReactElement => {
     switch (fileType) {
       case 'PDF':
         return <FileText className="h-4 w-4 text-red-600" />;
@@ -130,7 +188,12 @@ export function ContentsList() {
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  /**
+   * ステータスに応じたバッジのバリアントを取得する関数
+   * @param status ステータス
+   * @returns Badgeのバリアント
+   */
+  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
       case 'INDEXED':
         return 'default';
@@ -145,7 +208,12 @@ export function ContentsList() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  /**
+   * ステータスに応じた日本語ラベルを取得する関数
+   * @param status ステータス
+   * @returns 日本語ラベル
+   */
+  const getStatusLabel = (status: string): string => {
     switch (status) {
       case 'INDEXED':
         return 'インデックス済み';
@@ -160,24 +228,32 @@ export function ContentsList() {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
+  /**
+   * バイト数を人間が読みやすい形式に変換する関数
+   * @param bytes バイト数
+   * @returns フォーマットされたファイルサイズ文字列
+   */
+  const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const k: number = 1024;
+    const sizes: string[] = ['Bytes', 'KB', 'MB', 'GB'];
+    const i: number = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const filteredContents = contents.filter(content =>
+  // 検索条件に基づいてコンテンツをフィルタリング
+  const filteredContents: Content[] = contents.filter(content =>
     content.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     content.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     content.file_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const canManageContents = currentUser?.role === 'PLATFORM_ADMIN' || 
+  // コンテンツ管理権限の確認
+  const canManageContents: boolean = currentUser?.role === 'PLATFORM_ADMIN' || 
                            currentUser?.role === 'TENANT_ADMIN' || 
                            currentUser?.role === 'OPERATOR';
 
+  // ローディング状態の表示
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">

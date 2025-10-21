@@ -27,17 +27,17 @@ class BillingInfo(Base):
     tax_id = Column(String(100), nullable=True)
     
     # Period
-    current_period_start = Column(DateTime(timezone=False), nullable=True)
-    current_period_end = Column(DateTime(timezone=False), nullable=True)
-    trial_end = Column(DateTime(timezone=False), nullable=True)
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    trial_end = Column(DateTime(timezone=True), nullable=True)
     
     # Quotas / Usage
     quota_queries = Column(Integer, nullable=False, server_default='100')
     quota_storage_mb = Column(Integer, nullable=False, server_default='100')
     usage_queries = Column(Integer, nullable=False, server_default='0')
     usage_storage_mb = Column(Integer, nullable=False, server_default='0')
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    updated_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class Invoice(Base):
@@ -60,8 +60,8 @@ class Invoice(Base):
     currency = Column(String(3), nullable=False, default='JPY')
     status = Column(String(50), nullable=False, default='DRAFT')  # DRAFT/OPEN/PAID/VOID/UNCOLLECTIBLE
     due_date = Column(Date, nullable=False)
-    paid_at = Column(DateTime(timezone=False), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
     pdf_url = Column(String(1000), nullable=True)
     line_items = Column(JSONB, nullable=False, server_default='[]')
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    updated_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

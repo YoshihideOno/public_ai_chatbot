@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,13 +28,10 @@ import {
   ArrowLeft, 
   Save, 
   Building2,
-  Calendar,
   Key,
   Copy,
   Download,
-  Settings,
-  Users,
-  BarChart3
+  Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -68,7 +65,6 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string>('');
-  const [embedSnippet, setEmbedSnippet] = useState<string>('');
   
   const { user: currentUser } = useAuth();
   const router = useRouter();
@@ -103,13 +99,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   const watchedStatus = watch('status');
   const watchedSettings = watch('settings');
 
-  useEffect(() => {
-    if (tenantId && !isCreateMode) {
-      fetchTenant();
-    }
-  }, [tenantId, isCreateMode]);
-
-  const fetchTenant = async () => {
+  const fetchTenant = useCallback(async () => {
     if (!tenantId) return;
 
     try {
@@ -124,13 +114,19 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
       setValue('plan', tenantData.plan);
       setValue('status', tenantData.status);
       setValue('settings', tenantData.settings);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch tenant:', err);
       setError('テナント情報の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [tenantId, setValue]);
+
+  useEffect(() => {
+    if (tenantId && !isCreateMode) {
+      fetchTenant();
+    }
+  }, [tenantId, isCreateMode, fetchTenant]);
 
   const onSubmit = async (data: TenantFormData) => {
     setIsLoading(true);
@@ -144,11 +140,16 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
       }
       
       router.push('/tenants');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save tenant:', err);
       
-      if (err.response?.data?.error?.message) {
-        setError(err.response.data.error.message);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const errorResponse = err as { response?: { data?: { error?: { message?: string } } } };
+        if (errorResponse.response?.data?.error?.message) {
+          setError(errorResponse.response.data.error.message);
+        } else {
+          setError('テナントの保存に失敗しました');
+        }
       } else {
         setError('テナントの保存に失敗しました');
       }
@@ -168,7 +169,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
       const response = await apiClient.regenerateApiKey(tenantId);
       setApiKey(response.api_key);
       alert('APIキーが再発行されました');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to regenerate API key:', err);
       setError('APIキーの再発行に失敗しました');
     }
@@ -325,7 +326,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
                         <Label htmlFor="plan">プラン</Label>
                         <Select
                           value={watchedPlan}
-                          onValueChange={(value) => setValue('plan', value as any)}
+                          onValueChange={(value) => setValue('plan', value as 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE')}
                           disabled={isViewMode || !canEdit}
                         >
                           <SelectTrigger>
@@ -347,7 +348,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
                         <Label htmlFor="status">ステータス</Label>
                         <Select
                           value={watchedStatus}
-                          onValueChange={(value) => setValue('status', value as any)}
+                          onValueChange={(value) => setValue('status', value as 'ACTIVE' | 'SUSPENDED' | 'DELETED')}
                           disabled={isViewMode || !canEdit}
                         >
                           <SelectTrigger>
@@ -630,7 +631,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
               <div className="space-y-2">
                 <Label>埋め込みスニペット</Label>
                 <Textarea
-                  value={embedSnippet || `<!-- チャットウィジェット埋め込みコード -->
+                  value={`<!-- チャットウィジェット埋め込みコード -->
 <script>
   (function(w,d,s,o,f,js,fjs){
     w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
@@ -652,7 +653,21 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copyToClipboard(embedSnippet)}
+                    onClick={() => copyToClipboard(`<!-- チャットウィジェット埋め込みコード -->
+<script>
+  (function(w,d,s,o,f,js,fjs){
+    w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
+    js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
+    js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
+  }(window,document,'script','ragChat','https://cdn.rag-chatbot.com/widget.js'));
+  
+  ragChat('init', {
+    tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
+    apiKey: '${apiKey.slice(0, 20)}...',
+    theme: 'light',
+    position: 'bottom-right'
+  });
+</script>`)}
                   >
                     <Copy className="mr-2 h-4 w-4" />
                     コピー

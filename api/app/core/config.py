@@ -39,6 +39,7 @@ class Settings(BaseSettings):
         ANTHROPIC_API_KEY: Anthropic APIキー
         ENVIRONMENT: 実行環境
         DEBUG: デバッグモード
+        TIMEZONE: アプリケーションタイムゾーン
     """
     PROJECT_NAME: str = "AI Chatbot API"
     VERSION: str = "1.0.0"
@@ -51,6 +52,8 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
         "https://your-vercel-app.vercel.app",
     ]
     
@@ -63,6 +66,7 @@ class Settings(BaseSettings):
     # AI APIs
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None
 
     # Billing / External Integrations
     STRIPE_SECRET_KEY: Optional[str] = None
@@ -73,11 +77,16 @@ class Settings(BaseSettings):
     STRIPE_PRICE_PRO_MONTHLY: Optional[str] = None
     STRIPE_PRICE_PRO_YEARLY: Optional[str] = None
     RESEND_API_KEY: Optional[str] = None
+    EMAIL_FROM_ADDRESS: str = "noreply@synergysoft.jp"  # 本番環境用ドメイン
+    
     APP_URL: Optional[str] = None
     
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    
+    # Timezone
+    TIMEZONE: str = "Asia/Tokyo"
     
     class Config:
         """

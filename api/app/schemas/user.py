@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 from app.models.user import UserRole
 
 
@@ -24,6 +25,15 @@ class UserCreate(UserBase):
             raise ValueError('パスワードには小文字を含める必要があります')
         if not any(c.isdigit() for c in v):
             raise ValueError('パスワードには数字を含める必要があります')
+        return v
+    
+    @validator('role', pre=True)
+    def validate_role(cls, v):
+        if isinstance(v, str):
+            try:
+                return UserRole(v)
+            except ValueError:
+                raise ValueError(f'無効なロール: {v}')
         return v
 
 
@@ -60,7 +70,7 @@ class TenantInfo(BaseModel):
 
 
 class UserInDB(UserBase):
-    id: int
+    id: str
     tenant_id: Optional[str]
     is_active: bool
     is_verified: bool
@@ -68,6 +78,18 @@ class UserInDB(UserBase):
     created_at: datetime
     updated_at: Optional[datetime]
     tenant: Optional[TenantInfo] = None
+
+    @validator('id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+
+    @validator('tenant_id', pre=True)
+    def convert_tenant_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
     class Config:
         from_attributes = True
@@ -90,7 +112,7 @@ class Token(BaseModel):
 
 
 class TokenPayload(BaseModel):
-    sub: Optional[int] = None
+    sub: Optional[str] = None
     tenant_id: Optional[str] = None
     role: Optional[str] = None
 

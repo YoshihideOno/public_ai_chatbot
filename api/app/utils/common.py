@@ -3,7 +3,7 @@ import uuid
 import hashlib
 import secrets
 from typing import Any, Dict, List, Optional, Union
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
@@ -81,6 +81,14 @@ class ValidationUtils:
         """ドメイン名の形式チェック"""
         pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
         return bool(re.match(pattern, domain))
+    
+    @staticmethod
+    def validate_username(username: str) -> bool:
+        """ユーザー名の形式チェック（英数字とアンダースコアのみ）"""
+        if not username or len(username) < 3 or len(username) > 20:
+            return False
+        pattern = r'^[a-zA-Z0-9_]+$'
+        return bool(re.match(pattern, username))
     
     @staticmethod
     def validate_url(url: str) -> bool:
@@ -166,12 +174,34 @@ class StringUtils:
 
 
 class DateTimeUtils:
-    """日時操作ユーティリティ"""
+    """日時操作ユーティリティ（日本時間対応）"""
+    
+    # 日本時間のタイムゾーン
+    JST = timezone(timedelta(hours=9))
     
     @staticmethod
     def now() -> datetime:
-        """現在時刻取得"""
-        return datetime.utcnow()
+        """現在時刻取得（日本時間）"""
+        return datetime.now(DateTimeUtils.JST)
+    
+    @staticmethod
+    def utc_now() -> datetime:
+        """UTC現在時刻取得"""
+        return datetime.utcnow().replace(tzinfo=timezone.utc)
+    
+    @staticmethod
+    def to_jst(utc_dt: datetime) -> datetime:
+        """UTC時刻を日本時間に変換"""
+        if utc_dt.tzinfo is None:
+            utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+        return utc_dt.astimezone(DateTimeUtils.JST)
+    
+    @staticmethod
+    def to_utc(jst_dt: datetime) -> datetime:
+        """日本時間をUTC時刻に変換"""
+        if jst_dt.tzinfo is None:
+            jst_dt = jst_dt.replace(tzinfo=DateTimeUtils.JST)
+        return jst_dt.astimezone(timezone.utc)
     
     @staticmethod
     def add_days(dt: datetime, days: int) -> datetime:
@@ -194,14 +224,25 @@ class DateTimeUtils:
         return dt.strftime(format_str)
     
     @staticmethod
+    def format_jst_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+        """日本時間で日時フォーマット"""
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        jst_dt = dt.astimezone(DateTimeUtils.JST)
+        return jst_dt.strftime(format_str)
+    
+    @staticmethod
     def parse_datetime(date_str: str, format_str: str = "%Y-%m-%d %H:%M:%S") -> datetime:
         """日時パース"""
         return datetime.strptime(date_str, format_str)
     
     @staticmethod
     def is_expired(dt: datetime) -> bool:
-        """期限切れチェック"""
-        return dt < datetime.utcnow()
+        """期限切れチェック（日本時間基準）"""
+        now_jst = DateTimeUtils.now()
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(DateTimeUtils.JST) < now_jst
 
 
 class FileUtils:

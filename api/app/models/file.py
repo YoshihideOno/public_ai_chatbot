@@ -91,7 +91,7 @@ class File(Base):
     """
     __tablename__ = "files"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     file_name = Column(String(500), nullable=False)
@@ -103,13 +103,13 @@ class File(Base):
     description = Column(Text, nullable=True)
     tags = Column(JSONB, nullable=False, server_default='[]')
     metadata_json = Column('metadata', JSONB, nullable=False, server_default='{}')
-    uploaded_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    indexed_at = Column(DateTime(timezone=False), nullable=True)
+    uploaded_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    indexed_at = Column(DateTime(timezone=True), nullable=True)
     chunk_count = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    updated_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    deleted_at = Column(DateTime(timezone=False), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     tenant = relationship("Tenant", back_populates="files")

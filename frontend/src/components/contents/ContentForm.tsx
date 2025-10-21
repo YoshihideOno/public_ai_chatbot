@@ -1,6 +1,31 @@
+/**
+ * コンテンツ管理フォームコンポーネント
+ * 
+ * このファイルは、RAG AIプラットフォームにおけるコンテンツの作成・編集・表示を
+ * 管理するフォームコンポーネントを提供します。PDF、HTML、Markdown、CSV、TXT
+ * ファイルのアップロードと管理機能を実装しています。
+ * 
+ * 主な機能:
+ * - コンテンツの新規作成・編集・表示
+ * - ファイルアップロード機能（プログレス表示付き）
+ * - ファイルタイプ別のアイコン表示
+ * - コンテンツのステータス管理（アップロード済み、処理中、インデックス済み、失敗）
+ * - チャンク分割情報の表示
+ * - コンテンツの削除・再インデックス・複製機能
+ * - ロールベースのアクセス制御
+ * - タブ形式での情報表示（基本情報、コンテンツ、チャンク、分析）
+ * 
+ * 対応ファイル形式:
+ * - PDF: 文書ファイル
+ * - HTML: Webページ
+ * - MD: Markdown文書
+ * - CSV: 表形式データ
+ * - TXT: テキストファイル
+ */
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,14 +53,10 @@ import {
   ArrowLeft, 
   Save, 
   FileText,
-  Calendar,
   Upload,
   RefreshCw,
-  Eye,
-  Edit,
   Trash2,
   File,
-  FileImage,
   FileSpreadsheet,
   FileCode,
   FileType,
@@ -45,6 +66,10 @@ import {
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
+/**
+ * コンテンツフォームのバリデーションスキーマ
+ * Zodを使用してフォームデータの型安全性とバリデーションを実装
+ */
 const contentSchema = z.object({
   title: z.string().min(1, 'タイトルは必須です'),
   description: z.string().optional(),
@@ -52,20 +77,39 @@ const contentSchema = z.object({
   file_type: z.enum(['PDF', 'HTML', 'MD', 'CSV', 'TXT']),
 });
 
+/**
+ * コンテンツフォームデータの型定義
+ * contentSchemaから推論された型
+ */
 type ContentFormData = z.infer<typeof contentSchema>;
 
+/**
+ * ContentFormコンポーネントのプロパティ型定義
+ * @param contentId - 編集・表示するコンテンツのID（オプション）
+ * @param mode - フォームの動作モード（作成・編集・表示）
+ */
 interface ContentFormProps {
   contentId?: string;
   mode: 'create' | 'edit' | 'view';
 }
 
+/**
+ * コンテンツ管理フォームコンポーネント
+ * コンテンツの作成・編集・表示機能を提供するメインコンポーネント
+ * 
+ * @param contentId - 編集・表示するコンテンツのID（オプション）
+ * @param mode - フォームの動作モード（作成・編集・表示）
+ * @returns コンテンツ管理フォームのJSX要素
+ */
 export function ContentForm({ contentId, mode }: ContentFormProps) {
+  // コンテンツデータの状態管理
   const [content, setContent] = useState<Content | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   
+  // 認証情報とルーターの取得
   const { user: currentUser } = useAuth();
   const router = useRouter();
 
@@ -86,17 +130,16 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     },
   });
 
+  // フォームの監視対象フィールド
   const watchedFileType = watch('file_type');
   const watchedTitle = watch('title');
   const watchedDescription = watch('description');
 
-  useEffect(() => {
-    if (contentId && !isCreateMode) {
-      fetchContent();
-    }
-  }, [contentId, isCreateMode]);
-
-  const fetchContent = async () => {
+  /**
+   * コンテンツ情報を取得してフォームに設定する関数
+   * APIからコンテンツデータを取得し、フォームフィールドに値を設定します
+   */
+  const fetchContent = useCallback(async () => {
     if (!contentId) return;
 
     try {
@@ -109,14 +152,26 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
       setValue('description', contentData.description || '');
       setValue('file_type', contentData.file_type);
       setValue('tags', contentData.tags);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch content:', err);
       setError('コンテンツ情報の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [contentId, setValue]);
 
+  useEffect(() => {
+    if (contentId && !isCreateMode) {
+      fetchContent();
+    }
+  }, [contentId, isCreateMode, fetchContent]);
+
+  /**
+   * フォーム送信処理
+   * コンテンツの作成または更新を行い、成功時はコンテンツ一覧ページに遷移します
+   * 
+   * @param data - フォームから送信されたデータ
+   */
   const onSubmit = async (data: ContentFormData) => {
     setIsLoading(true);
     setError(null);
@@ -129,11 +184,16 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
       }
       
       router.push('/contents');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save content:', err);
       
-      if (err.response?.data?.error?.message) {
-        setError(err.response.data.error.message);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const errorResponse = err as { response?: { data?: { error?: { message?: string } } } };
+        if (errorResponse.response?.data?.error?.message) {
+          setError(errorResponse.response.data.error.message);
+        } else {
+          setError('コンテンツの保存に失敗しました');
+        }
       } else {
         setError('コンテンツの保存に失敗しました');
       }
@@ -142,6 +202,13 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     }
   };
 
+  /**
+   * ファイルアップロード処理
+   * 選択されたファイルをアップロードし、プログレス表示を行います
+   * アップロード完了後はコンテンツ一覧ページに遷移します
+   * 
+   * @param event - ファイル入力の変更イベント
+   */
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -161,7 +228,7 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
         });
       }, 200);
 
-      const uploadedContent = await apiClient.uploadFile(
+      await apiClient.uploadFile(
         file,
         watchedTitle || file.name.split('.')[0],
         watchedDescription,
@@ -173,7 +240,7 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
         router.push('/contents');
       }, 1000);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to upload file:', err);
       setError('ファイルのアップロードに失敗しました');
     } finally {
@@ -181,6 +248,11 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     }
   };
 
+  /**
+   * コンテンツ削除処理
+   * 確認ダイアログを表示してからコンテンツを削除し、
+   * 成功時はコンテンツ一覧ページに遷移します
+   */
   const handleDeleteContent = async () => {
     if (!contentId) return;
 
@@ -191,24 +263,34 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     try {
       await apiClient.deleteContent(contentId);
       router.push('/contents');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete content:', err);
       setError('コンテンツの削除に失敗しました');
     }
   };
 
+  /**
+   * コンテンツ再インデックス処理
+   * コンテンツの再インデックスを開始します（実装予定）
+   */
   const handleReindexContent = async () => {
     if (!contentId) return;
 
     try {
       // TODO: 再インデックスAPIを実装
       alert('再インデックスが開始されました');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to reindex content:', err);
       setError('再インデックスの開始に失敗しました');
     }
   };
 
+  /**
+   * ファイルタイプに応じたアイコンを取得する関数
+   * 
+   * @param fileType - ファイルタイプ（PDF, HTML, MD, CSV, TXT）
+   * @returns 対応するLucideアイコンコンポーネント
+   */
   const getFileTypeIcon = (fileType: string) => {
     switch (fileType) {
       case 'PDF':
@@ -226,6 +308,12 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     }
   };
 
+  /**
+   * ステータスに応じたバッジのバリアントを取得する関数
+   * 
+   * @param status - コンテンツのステータス
+   * @returns Badgeコンポーネントのバリアント名
+   */
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'INDEXED':
@@ -241,6 +329,12 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     }
   };
 
+  /**
+   * ステータスに応じた日本語ラベルを取得する関数
+   * 
+   * @param status - コンテンツのステータス
+   * @returns 日本語のステータスラベル
+   */
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'INDEXED':
@@ -256,6 +350,12 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     }
   };
 
+  /**
+   * バイト数を人間が読みやすい形式に変換する関数
+   * 
+   * @param bytes - バイト数
+   * @returns フォーマットされたファイルサイズ文字列
+   */
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -264,10 +364,12 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // コンテンツ管理権限のチェック
   const canManageContents = currentUser?.role === 'PLATFORM_ADMIN' || 
                            currentUser?.role === 'TENANT_ADMIN' || 
                            currentUser?.role === 'OPERATOR';
 
+  // ローディング中の表示
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -350,7 +452,7 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
                       <Label htmlFor="file_type">ファイルタイプ</Label>
                       <Select
                         value={watchedFileType}
-                        onValueChange={(value) => setValue('file_type', value as any)}
+                        onValueChange={(value) => setValue('file_type', value as ContentFormData['file_type'])}
                         disabled={isViewMode || !canManageContents}
                       >
                         <SelectTrigger>

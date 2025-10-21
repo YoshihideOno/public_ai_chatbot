@@ -1,7 +1,7 @@
 import logging
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 from contextlib import contextmanager
 import traceback
@@ -37,7 +37,7 @@ class StructuredLogger:
     ) -> Dict[str, Any]:
         """ログエントリ作成"""
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone(timedelta(hours=9))).isoformat(),
             "level": level,
             "message": message,
             "service": "rag-chatbot-api",

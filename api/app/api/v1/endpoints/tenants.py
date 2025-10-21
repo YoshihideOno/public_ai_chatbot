@@ -6,6 +6,7 @@ from app.schemas.tenant import (
     Tenant, TenantCreate, TenantUpdate, TenantStats, 
     TenantSettings, TenantEmbedSnippet
 )
+from app.schemas.user import User
 from app.services.tenant_service import TenantService
 from app.api.v1.deps import (
     get_current_user, 
@@ -48,31 +49,6 @@ async def get_tenants(
     )
     
     return tenants
-
-
-@router.post("/", response_model=Tenant)
-async def create_tenant(
-    tenant_data: TenantCreate,
-    current_user: User = Depends(require_platform_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """テナント作成（Platform Admin専用）"""
-    tenant_service = TenantService(db)
-    
-    try:
-        tenant = await tenant_service.create_tenant(tenant_data)
-        
-        BusinessLogger.log_user_action(
-            current_user.id,
-            "create_tenant",
-            "tenant",
-            tenant_id=tenant.id
-        )
-        
-        return tenant
-        
-    except ValueError as e:
-        raise ConflictError(str(e))
 
 
 @router.get("/{tenant_id}", response_model=Tenant)

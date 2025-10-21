@@ -8,6 +8,7 @@ from app.schemas.stats import (
     FeedbackStats, StorageStats, DashboardStats, AlertRule,
     Alert, SystemHealth, MonitoringConfig
 )
+from app.schemas.user import User
 from app.services.stats_service import StatsService, MonitoringService
 from app.api.v1.deps import (
     get_current_user, 

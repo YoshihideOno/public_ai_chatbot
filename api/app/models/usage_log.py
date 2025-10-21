@@ -15,4 +15,4 @@ class UsageLog(Base):
     tokens_out = Column(Integer, nullable=False, default=0)
     cost = Column(Numeric(10, 4), nullable=False, default=0)
     provider = Column(String(50), nullable=False)
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

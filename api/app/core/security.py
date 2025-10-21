@@ -20,10 +20,10 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException, status
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, InvalidTokenError, TokenExpiredError
-from app.utils.logging import SecurityLogger
+from app.utils.logging import SecurityLogger, ErrorLogger, logger
 
 # パスワードハッシュ化コンテキスト
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -45,14 +45,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     try:
         if not plain_password or not hashed_password:
-            SecurityLogger.warning("空のパスワードまたはハッシュが提供されました")
+            logger.warning("空のパスワードまたはハッシュが提供されました")
             return False
             
         result = pwd_context.verify(plain_password, hashed_password)
-        SecurityLogger.info(f"パスワード検証結果: {'成功' if result else '失敗'}")
+        logger.info(f"パスワード検証結果: {'成功' if result else '失敗'}")
         return result
     except Exception as e:
-        SecurityLogger.error(f"パスワード検証エラー: {str(e)}")
+        ErrorLogger.log_exception(e, {"operation": "verify_password"})
         raise ValueError("パスワード検証中にエラーが発生しました")
 
 
@@ -80,10 +80,10 @@ def get_password_hash(password: str) -> str:
             raise ValueError("パスワードは8文字以上である必要があります")
             
         hashed = pwd_context.hash(password)
-        SecurityLogger.info("パスワードのハッシュ化が完了しました")
+        logger.info("パスワードのハッシュ化が完了しました")
         return hashed
     except Exception as e:
-        SecurityLogger.error(f"パスワードハッシュ化エラー: {str(e)}")
+        ErrorLogger.log_exception(e, {"operation": "get_password_hash"})
         raise ValueError("パスワードのハッシュ化に失敗しました")
 
 
@@ -121,10 +121,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         })
         
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-        SecurityLogger.info(f"アクセストークン生成完了: ユーザーID {data.get('sub')}")
+        logger.info(f"アクセストークン生成完了: ユーザーID {data.get('sub')}")
         return encoded_jwt
     except Exception as e:
-        SecurityLogger.error(f"アクセストークン生成エラー: {str(e)}")
+        ErrorLogger.log_exception(e, {"operation": "create_access_token"})
         raise ValueError("アクセストークンの生成に失敗しました")
 
 
@@ -162,10 +162,10 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
         })
         
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-        SecurityLogger.info(f"リフレッシュトークン生成完了: ユーザーID {data.get('sub')}")
+        logger.info(f"リフレッシュトークン生成完了: ユーザーID {data.get('sub')}")
         return encoded_jwt
     except Exception as e:
-        SecurityLogger.error(f"リフレッシュトークン生成エラー: {str(e)}")
+        ErrorLogger.log_exception(e, {"operation": "create_refresh_token"})
         raise ValueError("リフレッシュトークンの生成に失敗しました")
 
 
@@ -195,16 +195,16 @@ def verify_token(token: str) -> Dict[str, Any]:
         # トークンタイプの検証
         token_type = payload.get("type")
         if token_type not in ["access", "refresh"]:
-            SecurityLogger.warning(f"無効なトークンタイプ: {token_type}")
+            logger.warning(f"無効なトークンタイプ: {token_type}")
             raise InvalidTokenError()
             
-        SecurityLogger.info(f"トークン検証成功: タイプ {token_type}")
+        logger.info(f"トークン検証成功: タイプ {token_type}")
         return payload
     except jwt.ExpiredSignatureError:
-        SecurityLogger.warning("期限切れトークンが検出されました")
+        logger.warning("期限切れトークンが検出されました")
         raise TokenExpiredError()
     except JWTError as e:
-        SecurityLogger.warning(f"無効なトークン: {str(e)}")
+        logger.warning(f"無効なトークン: {str(e)}")
         raise InvalidTokenError()
 
 
@@ -229,14 +229,14 @@ def extract_user_id_from_token(token: str) -> Optional[int]:
         user_id = payload.get("sub")
         
         if user_id is None:
-            SecurityLogger.warning("トークンにユーザーIDが含まれていません")
+            logger.warning("トークンにユーザーIDが含まれていません")
             return None
             
         user_id_int = int(user_id)
-        SecurityLogger.info(f"ユーザーID抽出成功: {user_id_int}")
+        logger.info(f"ユーザーID抽出成功: {user_id_int}")
         return user_id_int
     except (InvalidTokenError, TokenExpiredError, ValueError) as e:
-        SecurityLogger.warning(f"ユーザーID抽出失敗: {str(e)}")
+        logger.warning(f"ユーザーID抽出失敗: {str(e)}")
         return None
 
 
@@ -269,12 +269,12 @@ def is_token_expired(token: str) -> bool:
         
         exp = payload.get("exp")
         if exp is None:
-            SecurityLogger.warning("トークンに有効期限が設定されていません")
+            logger.warning("トークンに有効期限が設定されていません")
             return True
             
         is_expired = datetime.utcnow().timestamp() > exp
-        SecurityLogger.info(f"トークン有効期限チェック: {'期限切れ' if is_expired else '有効'}")
+        logger.info(f"トークン有効期限チェック: {'期限切れ' if is_expired else '有効'}")
         return is_expired
     except JWTError as e:
-        SecurityLogger.warning(f"トークン有効期限チェックエラー: {str(e)}")
+        logger.warning(f"トークン有効期限チェックエラー: {str(e)}")
         return True

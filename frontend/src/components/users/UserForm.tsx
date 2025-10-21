@@ -16,7 +16,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,14 +37,12 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { apiClient, User } from '@/lib/api';
+import { apiClient, User, ApiError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   ArrowLeft, 
   Save, 
   User as UserIcon,
-  Mail,
-  Calendar,
   Shield,
   Eye,
   EyeOff
@@ -96,13 +94,7 @@ export function UserForm({ userId, mode }: UserFormProps) {
   const watchedRole = watch('role');
   const watchedIsActive = watch('is_active');
 
-  useEffect(() => {
-    if (userId && !isCreateMode) {
-      fetchUser();
-    }
-  }, [userId, isCreateMode]);
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     if (!userId) return;
 
     try {
@@ -115,13 +107,19 @@ export function UserForm({ userId, mode }: UserFormProps) {
       setValue('username', userData.username);
       setValue('role', userData.role);
       setValue('is_active', userData.is_active);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch user:', err);
       setError('ユーザー情報の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId, setValue]);
+
+  useEffect(() => {
+    if (userId && !isCreateMode) {
+      fetchUser();
+    }
+  }, [userId, isCreateMode, fetchUser]);
 
   const onSubmit = async (data: UserFormData) => {
     setIsLoading(true);
@@ -135,11 +133,18 @@ export function UserForm({ userId, mode }: UserFormProps) {
       }
       
       router.push('/users');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save user:', err);
       
-      if (err.response?.data?.error?.message) {
-        setError(err.response.data.error.message);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: ApiError } };
+        if (axiosError.response?.data?.error?.message) {
+          setError(axiosError.response.data.error.message);
+        } else {
+          setError('ユーザーの保存に失敗しました');
+        }
+      } else if (err instanceof Error) {
+        setError(err.message);
       } else {
         setError('ユーザーの保存に失敗しました');
       }
@@ -289,7 +294,7 @@ export function UserForm({ userId, mode }: UserFormProps) {
                     <Label htmlFor="role">ロール</Label>
                     <Select
                       value={watchedRole}
-                      onValueChange={(value) => setValue('role', value as any)}
+                      onValueChange={(value) => setValue('role', value as UserFormData['role'])}
                       disabled={isViewMode || !canEdit}
                     >
                       <SelectTrigger>

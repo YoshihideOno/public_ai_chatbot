@@ -2,6 +2,7 @@ from pydantic import BaseModel, validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
+import re
 
 
 class TenantPlan(str, Enum):
@@ -35,26 +36,17 @@ class TenantBase(BaseModel):
     @validator('domain')
     def validate_domain(cls, v):
         if not v or len(v) < 3:
-            raise ValueError('ドメインは3文字以上である必要があります')
+            raise ValueError('テナント識別子は3文字以上である必要があります')
         if len(v) > 255:
-            raise ValueError('ドメインは255文字以内である必要があります')
-        # 基本的なドメイン形式チェック
-        if '.' not in v or v.startswith('.') or v.endswith('.'):
-            raise ValueError('有効なドメイン形式を入力してください')
+            raise ValueError('テナント識別子は255文字以内である必要があります')
+        # 英数字、ハイフン、アンダースコアのみ許可
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError('テナント識別子は英数字、ハイフン、アンダースコアのみ使用可能です')
         return v.lower()
 
 
 class TenantCreate(TenantBase):
-    admin_user: Optional[Dict[str, Any]] = None
-    
-    @validator('admin_user')
-    def validate_admin_user(cls, v):
-        if v is not None:
-            required_fields = ['email', 'username', 'password']
-            for field in required_fields:
-                if field not in v:
-                    raise ValueError(f'管理者ユーザーの{field}は必須です')
-        return v
+    pass
 
 
 class TenantUpdate(BaseModel):
@@ -77,11 +69,11 @@ class TenantUpdate(BaseModel):
     def validate_domain(cls, v):
         if v is not None:
             if len(v) < 3:
-                raise ValueError('ドメインは3文字以上である必要があります')
+                raise ValueError('テナント識別子は3文字以上である必要があります')
             if len(v) > 255:
-                raise ValueError('ドメインは255文字以内である必要があります')
-            if '.' not in v or v.startswith('.') or v.endswith('.'):
-                raise ValueError('有効なドメイン形式を入力してください')
+                raise ValueError('テナント識別子は255文字以内である必要があります')
+            if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+                raise ValueError('テナント識別子は英数字、ハイフン、アンダースコアのみ使用可能です')
         return v.lower() if v else v
 
 
@@ -127,6 +119,32 @@ class TenantSettings(BaseModel):
     enable_api_access: bool = True
     enable_webhook: bool = False
     webhook_url: Optional[str] = None
+    temperature: float = 0.7
+    max_tokens: int = 500
+    
+    @validator('default_model')
+    def validate_default_model(cls, v):
+        # 利用可能なモデル一覧（LLMServiceから取得）
+        available_models = [
+            "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
+            "claude-3-opus", "claude-3-sonnet", "claude-3-haiku",
+            "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro", "gemini-1.5-flash"
+        ]
+        if v not in available_models:
+            raise ValueError(f'サポートされていないモデル: {v}')
+        return v
+    
+    @validator('temperature')
+    def validate_temperature(cls, v):
+        if v < 0.0 or v > 2.0:
+            raise ValueError('temperatureは0.0-2.0の範囲である必要があります')
+        return v
+    
+    @validator('max_tokens')
+    def validate_max_tokens(cls, v):
+        if v < 1 or v > 4000:
+            raise ValueError('max_tokensは1-4000の範囲である必要があります')
+        return v
     
     @validator('chunk_size')
     def validate_chunk_size(cls, v):

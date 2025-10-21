@@ -7,7 +7,7 @@
 
 from typing import Optional, Dict, Any
 from app.core.config import settings
-from app.utils.logging import BusinessLogger, ErrorLogger
+from app.utils.logging import BusinessLogger, ErrorLogger, logger
 
 try:
     import resend  # type: ignore
@@ -19,7 +19,7 @@ class EmailService:
     """
     メール送信サービス
     
-    Resend APIを用いてメール送信を行います。
+    Resend APIを使用してメール送信を行います。
     """
 
     def __init__(self):
@@ -40,30 +40,38 @@ class EmailService:
             bool: 送信成功可否
         """
         if not settings.RESEND_API_KEY or resend is None:
-            ErrorLogger.error("Resend未設定のためメール送信をスキップ")
+            logger.warning("Resend未設定のためメール送信をスキップ")
             return False
         
         try:
             # Resend 2.x系の新しいAPIを使用
             params = {
-                "from": "billing@rag-ai.com",
+                "from": settings.EMAIL_FROM_ADDRESS,  # 環境変数から取得
                 "to": [to_email],
                 "subject": subject,
                 "html": html,
             }
             
-            # 新しいAPIでメール送信
-            response = resend.Emails.send(params)  # type: ignore
+            # 新しいAPIでメール送信（非同期実行、タイムアウト設定付き）
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: resend.Emails.send(params)  # type: ignore
+                ),
+                timeout=30.0  # 30秒のタイムアウト
+            )
             
             if response and hasattr(response, 'id'):
                 BusinessLogger.info(f"領収書メール送信完了: {response.id}")
                 return True
             else:
-                ErrorLogger.error("メール送信レスポンスが無効です")
+                logger.error("メール送信レスポンスが無効です")
                 return False
                 
         except Exception as e:
-            ErrorLogger.error(f"メール送信失敗: {str(e)}")
+            logger.error(f"メール送信失敗: {str(e)}")
             return False
 
     @staticmethod
@@ -79,7 +87,7 @@ class EmailService:
             bool: 送信成功可否
         """
         if not settings.RESEND_API_KEY or resend is None:
-            ErrorLogger.error("Resend未設定のためメール送信をスキップ")
+            logger.warning("Resend未設定のためメール送信をスキップ")
             return False
         
         subject = "パスワードリセットのお知らせ"
@@ -97,7 +105,7 @@ class EmailService:
         
         try:
             params = {
-                "from": "noreply@rag-ai.com",
+                "from": settings.EMAIL_FROM_ADDRESS,  # 環境変数から取得
                 "to": [to_email],
                 "subject": subject,
                 "html": html,
@@ -109,11 +117,202 @@ class EmailService:
                 BusinessLogger.info(f"パスワードリセットメール送信完了: {response.id}")
                 return True
             else:
-                ErrorLogger.error("パスワードリセットメール送信レスポンスが無効です")
+                logger.error("パスワードリセットメール送信レスポンスが無効です")
                 return False
                 
         except Exception as e:
-            ErrorLogger.error(f"パスワードリセットメール送信失敗: {str(e)}")
+            logger.error(f"パスワードリセットメール送信失敗: {str(e)}")
+            return False
+
+    @staticmethod
+    async def send_user_registration_email(to_email: str, username: str, confirmation_url: str) -> bool:
+        """
+        ユーザー登録確認メール送信
+        
+        引数:
+            to_email: 送信先メールアドレス
+            username: ユーザー名
+            confirmation_url: 確認URL
+        戻り値:
+            bool: 送信成功可否
+        """
+        subject = "アカウント登録の確認"
+        html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #333; margin-bottom: 20px;">アカウント登録の確認</h2>
+                <p>こんにちは、{username}さん</p>
+                <p>AI Chatbot Platformへのご登録ありがとうございます。</p>
+                <p>アカウントを有効化するために、以下のリンクをクリックしてください：</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{confirmation_url}" 
+                       style="background-color: #007bff; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 4px; display: inline-block;">
+                        アカウントを有効化
+                    </a>
+                </div>
+                <p style="color: #666; font-size: 14px;">
+                    このリンクは24時間で期限切れになります。<br>
+                    心当たりのない場合は、このメールを無視してください。
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">
+                    AI Chatbot Platform<br>
+                    このメールは自動送信されています。
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # 開発環境ではメール送信をスキップし、ログに確認URLを出力
+        if settings.ENVIRONMENT == "development":
+            logger.info(f"【開発環境】ユーザー登録確認メール送信（スキップ）")
+            logger.info(f"送信先: {to_email}")
+            logger.info(f"ユーザー名: {username}")
+            logger.info(f"確認URL: {confirmation_url}")
+            logger.info(f"↑ このURLをブラウザで開いてテストしてください")
+            return True
+        
+        # 本番環境ではResend APIを使用
+        if not settings.RESEND_API_KEY or resend is None:
+            logger.warning("Resend未設定のためメール送信をスキップ")
+            return False
+        
+        try:
+            params = {
+                "from": settings.EMAIL_FROM_ADDRESS,  # 環境変数から取得
+                "to": [to_email],
+                "subject": subject,
+                "html": html,
+            }
+            
+            # 非同期でメール送信を実行（タイムアウト設定付き）
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None, 
+                    lambda: resend.Emails.send(params)  # type: ignore
+                ),
+                timeout=30.0  # 30秒のタイムアウト
+            )
+            
+            if response and hasattr(response, 'id'):
+                BusinessLogger.info(f"ユーザー登録確認メール送信完了: {response.id}")
+                return True
+            else:
+                logger.error("ユーザー登録確認メール送信レスポンスが無効です")
+                return False
+                
+        except Exception as e:
+            logger.error(f"ユーザー登録確認メール送信失敗: {str(e)}")
+            return False
+
+    @staticmethod
+    async def send_trial_reminder_email(
+        to_email: str, 
+        username: str, 
+        tenant_name: str, 
+        days_remaining: int, 
+        trial_end_date
+    ) -> bool:
+        """
+        お試し利用期間終了前のリマインダーメール送信
+        
+        引数:
+            to_email: 送信先メールアドレス
+            username: ユーザー名
+            tenant_name: テナント名
+            days_remaining: 残り日数
+            trial_end_date: お試し利用終了日
+        戻り値:
+            bool: 送信成功可否
+        """
+        subject = f"お試し利用期間終了まで{days_remaining}日のお知らせ"
+        html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #333; margin-bottom: 20px;">お試し利用期間終了のお知らせ</h2>
+                <p>こんにちは、{username}さん</p>
+                <p>{tenant_name}のお試し利用期間が<strong>{days_remaining}日後</strong>に終了します。</p>
+                
+                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                    <p style="margin: 0; color: #856404;">
+                        <strong>終了日時:</strong> {trial_end_date.strftime('%Y年%m月%d日 %H:%M')}
+                    </p>
+                </div>
+                
+                <p>サービスを継続してご利用いただくには、サブスクリプションにご登録ください。</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{settings.APP_URL or 'http://localhost:3000'}/billing/plans" 
+                       style="background-color: #28a745; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 4px; display: inline-block;">
+                        サブスクリプションに登録
+                    </a>
+                </div>
+                
+                <p style="color: #666; font-size: 14px;">
+                    お試し利用期間終了後は、サービスをご利用いただけません。<br>
+                    ご不明な点がございましたら、お気軽にお問い合わせください。
+                </p>
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">
+                    AI Chatbot Platform<br>
+                    このメールは自動送信されています。
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # 開発環境ではメール送信をスキップし、ログに情報を出力
+        if settings.ENVIRONMENT == "development":
+            logger.info(f"【開発環境】リマインダーメール送信（スキップ）")
+            logger.info(f"送信先: {to_email}")
+            logger.info(f"ユーザー名: {username}")
+            logger.info(f"テナント名: {tenant_name}")
+            logger.info(f"残り日数: {days_remaining}日")
+            logger.info(f"終了日: {trial_end_date}")
+            return True
+        
+        # 本番環境ではResend APIを使用
+        if not settings.RESEND_API_KEY or resend is None:
+            logger.warning("Resend未設定のためメール送信をスキップ")
+            return False
+        
+        try:
+            params = {
+                "from": settings.EMAIL_FROM_ADDRESS,
+                "to": [to_email],
+                "subject": subject,
+                "html": html,
+            }
+            
+            # 非同期でメール送信を実行（タイムアウト設定付き）
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: resend.Emails.send(params)  # type: ignore
+                ),
+                timeout=30.0  # 30秒のタイムアウト
+            )
+            
+            if response and hasattr(response, 'id'):
+                BusinessLogger.info(f"リマインダーメール送信完了: {response.id}")
+                return True
+            else:
+                logger.error("リマインダーメール送信レスポンスが無効です")
+                return False
+                
+        except Exception as e:
+            logger.error(f"リマインダーメール送信失敗: {str(e)}")
             return False
 
 

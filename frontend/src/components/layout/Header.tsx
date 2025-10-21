@@ -142,47 +142,49 @@ export function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center space-x-6">
-          <Link
-            href="/users"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname.startsWith('/users') ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            ユーザー管理
-          </Link>
-          <Link
-            href="/tenants"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname.startsWith('/tenants') ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            テナント管理
-          </Link>
-          <Link
-            href="/contents"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname.startsWith('/contents') ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            コンテンツ管理
-          </Link>
-          <Link
-            href="/stats"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname.startsWith('/stats') ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            統計・分析
-          </Link>
-        </nav>
+        {user && (
+          <nav className="hidden md:flex items-center space-x-6">
+            <Link
+              href="/users"
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname.startsWith('/users') ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              ユーザー管理
+            </Link>
+            <Link
+              href="/tenants"
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname.startsWith('/tenants') ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              テナント管理
+            </Link>
+            <Link
+              href="/contents"
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname.startsWith('/contents') ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              コンテンツ管理
+            </Link>
+            <Link
+              href="/stats"
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname.startsWith('/stats') ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              統計・分析
+            </Link>
+          </nav>
+        )}
 
         <div className="flex items-center space-x-4">
-          {user && (
+          {user ? (
             <div className="flex items-center space-x-2">
               <Badge variant={getRoleBadgeVariant(user.role)}>
                 {getRoleLabel(user.role)}
@@ -225,6 +227,10 @@ export function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          ) : (
+            <Button asChild>
+              <Link href="/login">ログイン</Link>
+            </Button>
           )}
         </div>
       </div>
@@ -239,6 +245,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const navigation = [
     {
@@ -268,6 +275,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     },
   ];
 
+  // 認証されていない場合はサイドバーを表示しない
+  if (!user) {
+    return null;
+  }
+
   return (
     <>
       {/* オーバーレイ */}
@@ -286,22 +298,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           "md:translate-x-0 md:static md:inset-0"
         )}
       >
-        <div className="flex h-16 items-center justify-between px-6 border-b">
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">RAG</span>
-            </div>
-            <span className="font-bold text-lg">AI Platform</span>
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
+        {/* 閉じるボタンのみをモバイルで右上に表示（空欄は作らない） */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden absolute right-2 top-2"
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" />
+        </Button>
         
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navigation.map((item) => {
@@ -329,9 +334,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   );
 }
 
-interface FooterProps {}
-
-export function Footer({}: FooterProps) {
+export function Footer() {
   return (
     <footer className="border-t bg-background">
       <div className="container py-6">

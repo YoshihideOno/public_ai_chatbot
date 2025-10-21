@@ -6,7 +6,6 @@
 
 主な機能:
 - テナント基本情報の管理
-- APIキー管理
 - 設定情報の保存
 - ユーザーとの関連付け
 """
@@ -31,25 +30,28 @@ class Tenant(Base):
         domain: テナントのドメイン名（ユニーク）
         plan: プラン種別（FREE, BASIC, PRO, ENTERPRISE）
         status: ステータス（ACTIVE, SUSPENDED, DELETED）
-        api_key: APIアクセス用キー（ユニーク）
         settings: テナント固有の設定（JSON形式）
+        knowledge_registered_at: 初回ナレッジ登録日時
         created_at: 作成日時
         updated_at: 更新日時
         deleted_at: 削除日時（ソフトデリート用）
     """
     __tablename__ = "tenants"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     name = Column(String(255), nullable=False)
-    domain = Column(String(255), nullable=False, unique=True)
+    domain = Column(String(255), nullable=False)
     plan = Column(String(50), nullable=False, default="FREE")
     status = Column(String(50), nullable=False, default="ACTIVE")
-    api_key = Column(String(255), nullable=False, unique=True)
     settings = Column(JSONB, nullable=False, server_default='{}')
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    updated_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
-    deleted_at = Column(DateTime(timezone=False), nullable=True)
+    knowledge_registered_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     users = relationship("User", back_populates="tenant")
     files = relationship("File", back_populates="tenant")
+    api_keys = relationship("ApiKey", back_populates="tenant")
+    reminder_logs = relationship("ReminderLog", back_populates="tenant")
+    notifications = relationship("Notification", back_populates="tenant")

@@ -1,16 +1,39 @@
 services:
-  nextjs-app:
+  # 管理機能フロントエンド
+  frontend-admin:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    env_file:
+      - ./frontend/.env
+      - ./.env.local
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - TZ=Asia/Tokyo
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - db
+      - fastapi
+
+  # AIチャットボットフロントエンド
+  frontend-chatbot:
     build:
       context: ./ai_chatbot_app
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - ./ai_chatbot_app:/app
     env_file:
       - ./.env.local
     environment:
       - NODE_ENV=${NODE_ENV:-development}
+      - TZ=Asia/Tokyo
     command: sh -c "npm install && npm run dev"
     depends_on:
       - db
@@ -25,9 +48,11 @@ services:
     volumes:
       - ./api:/app
     env_file:
+      - ./api/.env
       - ./.env.local
     environment:
-      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ai_chatbot_db
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ai_chatbot_db?options=-c%20timezone%3DAsia%2FTokyo
+      - TZ=Asia/Tokyo
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
@@ -39,6 +64,8 @@ services:
       - ./.env.local
     volumes:
       - db-data:/var/lib/postgresql/data
+    environment:
+      - TZ=Asia/Tokyo
     # ローカル開発でDBへ外部接続が必要な場合のみ、以下をoverrideファイルで有効化
     ports:
       - "5432:5432"

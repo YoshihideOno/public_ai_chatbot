@@ -27,6 +27,23 @@ export interface User {
   last_login_at?: string;
 }
 
+export interface TenantSettings {
+  max_users?: number;
+  max_contents?: number;
+  max_storage_mb?: number;
+  features?: string[];
+  custom_domain?: string;
+  branding?: {
+    logo_url?: string;
+    primary_color?: string;
+    secondary_color?: string;
+  };
+  notifications?: {
+    email_enabled?: boolean;
+    webhook_url?: string;
+  };
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -34,7 +51,7 @@ export interface Tenant {
   plan: 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE';
   status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
   api_key: string;
-  settings: Record<string, any>;
+  settings: TenantSettings;
   created_at: string;
   updated_at?: string;
 }
@@ -58,7 +75,7 @@ export interface ChatRequest {
   session_id: string;
   query: string;
   context?: {
-    user_metadata?: Record<string, any>;
+    user_metadata?: Record<string, string | number | boolean>;
   };
   options?: {
     model?: string;
@@ -91,6 +108,29 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  role: 'OPERATOR' | 'AUDITOR';
+}
+
+export interface TenantRegistrationRequest {
+  tenant_name: string;
+  tenant_domain: string;
+  admin_email: string;
+  admin_username: string;
+  admin_password: string;
+}
+
+export interface TenantRegistrationResponse {
+  tenant_id: string;
+  tenant_name: string;
+  admin_user_id: string;
+  admin_email: string;
+  message: string;
+}
+
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;
@@ -103,12 +143,65 @@ export interface ApiError {
   error: {
     code: string;
     message: string;
-    details?: any;
+    details?: Record<string, unknown>;
   };
 }
 
+export interface AdminRequest {
+  id: number;
+  user_id: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  created_at: string;
+  reviewed_at?: string;
+  reviewed_by?: number;
+  review_comment?: string;
+}
+
+export interface UsageStats {
+  period: string;
+  total_requests: number;
+  total_tokens: number;
+  total_cost: number;
+  active_users: number;
+  data_points: Array<{
+    date: string;
+    requests: number;
+    tokens: number;
+    cost: number;
+    users: number;
+  }>;
+}
+
+export interface DashboardStats {
+  period: string;
+  overview: {
+    total_users: number;
+    total_tenants: number;
+    total_contents: number;
+    total_chats: number;
+  };
+  usage: {
+    requests_today: number;
+    requests_this_month: number;
+    tokens_today: number;
+    tokens_this_month: number;
+  };
+  revenue: {
+    monthly_revenue: number;
+    yearly_revenue: number;
+    growth_rate: number;
+  };
+  top_tenants: Array<{
+    tenant_id: string;
+    tenant_name: string;
+    request_count: number;
+    revenue: number;
+  }>;
+}
+
 // APIクライアントクラス
-class ApiClient {
+export class ApiClient {
   /**
    * APIクライアント
    * 
@@ -123,11 +216,21 @@ class ApiClient {
   private client: AxiosInstance;
   private baseURL: string;
 
-  constructor(baseURL: string = 'http://localhost:8000') {
-    this.baseURL = baseURL;
+  constructor(baseURL?: string) {
+    // 環境に応じてベースURLを設定
+    if (baseURL) {
+      this.baseURL = baseURL;
+    } else if (typeof window !== 'undefined') {
+      // ブラウザ環境では環境変数または localhost を使用
+      this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    } else {
+      // サーバーサイド環境では Docker サービス名を使用
+      this.baseURL = 'http://fastapi:8000';
+    }
+    
     this.client = axios.create({
-      baseURL: `${baseURL}/api/v1`,
-      timeout: 30000,
+      baseURL: `${this.baseURL}/api/v1`,
+      timeout: 30000,  // 30秒のタイムアウト
       headers: {
         'Content-Type': 'application/json',
       },
@@ -166,7 +269,7 @@ class ApiClient {
               const originalRequest = error.config;
               originalRequest.headers.Authorization = `Bearer ${response.access_token}`;
               return this.client(originalRequest);
-            } catch (refreshError) {
+            } catch {
               // リフレッシュも失敗した場合、ログイン画面にリダイレクト
               localStorage.removeItem('access_token');
               localStorage.removeItem('refresh_token');
@@ -187,6 +290,49 @@ class ApiClient {
     return response.data;
   }
 
+  async register(data: RegisterRequest): Promise<void> {
+    const response = await this.client.post('/auth/register', data);
+    return response.data;
+  }
+
+  async registerTenant(data: TenantRegistrationRequest): Promise<TenantRegistrationResponse> {
+    // テナント登録のタイムアウト設定
+    const response = await this.client.post('/auth/register-tenant', data, {
+      timeout: 30000,  // 30秒のタイムアウト
+    });
+    return response.data;
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    const response = await this.client.post('/auth/password-reset', { email });
+    return response.data;
+  }
+
+  async confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+    const response = await this.client.post('/auth/password-reset/confirm', {
+      token,
+      new_password: newPassword
+    });
+    return response.data;
+  }
+
+  async verifyEmail(token: string): Promise<{ message: string; user_id: string; email: string }> {
+    const response = await this.client.post('/auth/verify-email', null, {
+      params: { token }
+    });
+    return response.data;
+  }
+
+  async requestAdminRole(reason: string): Promise<void> {
+    const response = await this.client.post('/auth/admin-request', { reason });
+    return response.data;
+  }
+
+  async getAdminRequests(): Promise<AdminRequest[]> {
+    const response = await this.client.get('/auth/admin-requests');
+    return response.data;
+  }
+
   async logout(): Promise<void> {
     await this.client.post('/auth/logout');
     localStorage.removeItem('access_token');
@@ -201,7 +347,7 @@ class ApiClient {
         billing_cycle: billingCycle
       });
       return res.data;
-    } catch (error: any) {
+    } catch (error) {
       throw error;
     }
   }
@@ -324,7 +470,7 @@ class ApiClient {
   }
 
   // 統計情報
-  async getUsageStats(startDate?: string, endDate?: string, granularity?: string): Promise<any> {
+  async getUsageStats(startDate?: string, endDate?: string, granularity?: string): Promise<UsageStats> {
     const params = new URLSearchParams();
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
@@ -334,7 +480,7 @@ class ApiClient {
     return response.data;
   }
 
-  async getDashboardStats(period: string = 'month'): Promise<any> {
+  async getDashboardStats(period: string = 'month'): Promise<DashboardStats> {
     const response = await this.client.get(`/stats/dashboard?period=${period}`);
     return response.data;
   }

@@ -47,7 +47,8 @@ async def get_current_user(
     
     # Get user from database
     user_service = UserService(db)
-    user = await user_service.get_by_id(int(user_id))
+    # user_idはUUID文字列のため、そのまま渡す
+    user = await user_service.get_by_id(user_id)
     
     if user is None:
         raise HTTPException(
@@ -132,7 +133,7 @@ async def get_current_user_optional(
             return None
         
         user_service = UserService(db)
-        user = await user_service.get_by_id(int(user_id))
+        user = await user_service.get_by_id(user_id)
         
         if user and user.is_active:
             return user

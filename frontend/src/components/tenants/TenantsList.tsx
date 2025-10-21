@@ -78,7 +78,7 @@ export function TenantsList() {
       
       setTenants(tenantsData);
       setTotalPages(Math.ceil(tenantsData.length / itemsPerPage));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch tenants:', err);
       setError('テナント一覧の取得に失敗しました');
     } finally {
@@ -98,7 +98,7 @@ export function TenantsList() {
     try {
       await apiClient.deleteTenant(tenantId);
       setTenants(tenants.filter(tenant => tenant.id !== tenantId));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete tenant:', err);
       setError('テナントの削除に失敗しました');
     }
@@ -114,7 +114,7 @@ export function TenantsList() {
       // テナント一覧を更新
       await fetchTenants(currentPage);
       alert(`新しいAPIキー: ${response.api_key}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to regenerate API key:', err);
       setError('APIキーの再発行に失敗しました');
     }

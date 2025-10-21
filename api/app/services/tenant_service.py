@@ -16,7 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
+from app.core.constants import ReminderSettings, SystemMessages
 import uuid
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
@@ -63,7 +64,7 @@ class TenantService:
             )
             return result.scalar_one_or_none()
         except Exception as e:
-            BusinessLogger.error(f"テナント取得エラー: {str(e)}")
+            logger.error(f"テナント取得エラー: {str(e)}")
             raise
 
     async def get_by_domain(self, domain: str) -> Optional[Tenant]:
@@ -80,18 +81,12 @@ class TenantService:
             SQLAlchemyError: データベースエラー
         """
         try:
-            # ドメイン名のバリデーション
-            if not ValidationUtils.is_valid_domain(domain):
-                raise ValueError("無効なドメイン名です")
-                
             result = await self.db.execute(
-                select(Tenant)
-                .options(selectinload(Tenant.users))
-                .where(Tenant.domain == domain)
+                select(Tenant).where(Tenant.domain == domain)
             )
             return result.scalar_one_or_none()
         except Exception as e:
-            BusinessLogger.error(f"ドメイン検索エラー: {str(e)}")
+            logger.error(f"ドメイン検索エラー: {str(e)}")
             raise
 
     async def get_by_api_key(self, api_key: str) -> Optional[Tenant]:
@@ -142,14 +137,6 @@ class TenantService:
 
     async def create_tenant(self, tenant_data: TenantCreate) -> Tenant:
         """テナント作成"""
-        # ドメインの重複チェック
-        existing_tenant = await self.get_by_domain(tenant_data.domain)
-        if existing_tenant:
-            raise ValueError("このドメインは既に使用されています")
-        
-        # APIキー生成
-        api_key = StringUtils.generate_api_key("pk_live")
-        
         # テナント作成
         db_tenant = Tenant(
             id=str(uuid.uuid4()),
@@ -157,37 +144,13 @@ class TenantService:
             domain=tenant_data.domain,
             plan=tenant_data.plan,
             status=tenant_data.status,
-            api_key=api_key,
             settings=tenant_data.settings
         )
         
         self.db.add(db_tenant)
-        await self.db.commit()
+        # トランザクション内ではcommitしない
+        await self.db.flush()  # flushでIDを取得
         await self.db.refresh(db_tenant)
-        
-        # 管理者ユーザー作成
-        if tenant_data.admin_user:
-            user_service = UserService(self.db)
-            admin_user_data = {
-                "email": tenant_data.admin_user["email"],
-                "username": tenant_data.admin_user["username"],
-                "password": tenant_data.admin_user["password"],
-                "role": UserRole.TENANT_ADMIN,
-                "tenant_id": db_tenant.id
-            }
-            
-            admin_user = await user_service.create_user(admin_user_data)
-            
-            BusinessLogger.log_tenant_action(
-                db_tenant.id,
-                "tenant_created",
-                {
-                    "name": db_tenant.name,
-                    "domain": db_tenant.domain,
-                    "plan": db_tenant.plan,
-                    "admin_user_id": admin_user.id
-                }
-            )
         
         return db_tenant
 
@@ -197,11 +160,7 @@ class TenantService:
         if not tenant:
             return None
         
-        # ドメイン変更時の重複チェック
-        if tenant_update.domain and tenant_update.domain != tenant.domain:
-            existing_tenant = await self.get_by_domain(tenant_update.domain)
-            if existing_tenant:
-                raise ValueError("このドメインは既に使用されています")
+        # ドメイン変更時のバリデーション（重複チェックは削除）
         
         update_data = tenant_update.dict(exclude_unset=True)
         
@@ -428,3 +387,141 @@ class TenantService:
             "total_users": 0,
             "last_activity": None
         }
+    
+    async def update_knowledge_registration_date(self, tenant_id: str) -> bool:
+        """
+        ナレッジ登録日時を更新
+        
+        初回ナレッジ登録時に呼び出されます。
+        
+        引数:
+            tenant_id: テナントID
+        戻り値:
+            bool: 更新成功時True
+        """
+        try:
+            tenant = await self.get_by_id(tenant_id)
+            if not tenant:
+                return False
+            
+            # 既に登録日時が設定されている場合は更新しない
+            if tenant.knowledge_registered_at:
+                return True
+            
+            # ナレッジ登録日時を現在時刻に設定
+            tenant.knowledge_registered_at = datetime.utcnow()
+            await self.db.commit()
+            
+            BusinessLogger.log_user_action(
+                tenant_id,
+                "knowledge_registered",
+                "tenant",
+                tenant_id=tenant_id
+            )
+            
+            return True
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"ナレッジ登録日時更新エラー: {str(e)}")
+            raise
+    
+    async def check_trial_period_status(self, tenant_id: str) -> Dict[str, Any]:
+        """
+        お試し利用期間の状態をチェック
+        
+        引数:
+            tenant_id: テナントID
+        戻り値:
+            Dict[str, Any]: 期間状態情報
+                - is_trial_active: お試し利用中かどうか
+                - is_expired: 期間満了かどうか
+                - days_remaining: 残り日数
+                - trial_end_date: お試し利用終了日
+                - message: 状態メッセージ
+        """
+        try:
+            tenant = await self.get_by_id(tenant_id)
+            if not tenant:
+                return {
+                    "is_trial_active": False,
+                    "is_expired": True,
+                    "days_remaining": 0,
+                    "trial_end_date": None,
+                    "message": "テナントが見つかりません"
+                }
+            
+            # ナレッジ登録日時が設定されていない場合
+            if not tenant.knowledge_registered_at:
+                return {
+                    "is_trial_active": False,
+                    "is_expired": False,
+                    "days_remaining": None,
+                    "trial_end_date": None,
+                    "message": "ナレッジが登録されていません"
+                }
+            
+            # お試し利用期間の計算
+            trial_period = ReminderSettings.get_trial_period()
+            trial_end_date = tenant.knowledge_registered_at + trial_period
+            current_date = datetime.utcnow()
+            
+            # 期間満了チェック
+            is_expired = current_date > trial_end_date
+            days_remaining = (trial_end_date - current_date).days if not is_expired else 0
+            
+            # サブスクリプション状態のチェック（BillingInfoから取得）
+            # TODO: BillingInfoサービスと連携してサブスクリプション状態を確認
+            has_active_subscription = False  # 仮の値
+            
+            # お試し利用中かどうかの判定
+            is_trial_active = not is_expired and not has_active_subscription
+            
+            # メッセージの生成
+            if has_active_subscription:
+                message = "サブスクリプション契約中です"
+            elif is_expired:
+                message = SystemMessages.TRIAL_EXPIRED_MESSAGE
+            elif days_remaining <= 0:
+                message = SystemMessages.TRIAL_EXPIRED_MESSAGE
+            else:
+                message = f"お試し利用中（残り{days_remaining}日）"
+            
+            return {
+                "is_trial_active": is_trial_active,
+                "is_expired": is_expired,
+                "days_remaining": max(0, days_remaining),
+                "trial_end_date": trial_end_date,
+                "message": message
+            }
+            
+        except Exception as e:
+            logger.error(f"お試し利用期間チェックエラー: {str(e)}")
+            return {
+                "is_trial_active": False,
+                "is_expired": True,
+                "days_remaining": 0,
+                "trial_end_date": None,
+                "message": "期間チェックに失敗しました"
+            }
+    
+    async def can_use_service(self, tenant_id: str) -> bool:
+        """
+        サービス利用可能かチェック
+        
+        お試し利用期間内またはサブスクリプション契約中の場合にTrueを返します。
+        
+        引数:
+            tenant_id: テナントID
+        戻り値:
+            bool: サービス利用可能な場合True
+        """
+        try:
+            status_info = await self.check_trial_period_status(tenant_id)
+            
+            # お試し利用中またはサブスクリプション契約中の場合
+            return status_info["is_trial_active"] or not status_info["is_expired"]
+            
+        except Exception as e:
+            logger.error(f"サービス利用可能性チェックエラー: {str(e)}")
+            return False

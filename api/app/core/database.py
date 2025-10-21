@@ -20,12 +20,21 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 import logging
 
-# Create async engine
+# Create async engine with optimized pool settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
-    poolclass=NullPool,
+    poolclass=NullPool,  # 非同期エンジンではNullPoolを使用
+    connect_args={
+        "command_timeout": 30,  # コマンドタイムアウト（30秒）
+        "server_settings": {
+            "application_name": "ai_chatbot_api",
+            "lock_timeout": "30s",  # ロックタイムアウト（30秒）
+            "statement_timeout": "60s",  # ステートメントタイムアウト（60秒）
+            "timezone": "Asia/Tokyo",  # タイムゾーン設定
+        }
+    }
 )
 
 # Create async session factory
@@ -55,6 +64,13 @@ async def get_db() -> AsyncSession:
     """
     async with AsyncSessionLocal() as session:
         try:
+            # NullPoolの場合は接続プール情報をスキップ
+            if hasattr(engine.pool, 'size'):
+                pool = engine.pool
+                logging.info(f"DB接続プール状態: size={pool.size()}, checked_in={pool.checkedin()}, checked_out={pool.checkedout()}, overflow={pool.overflow()}")
+            else:
+                logging.info("DB接続: NullPool使用中")
+            
             yield session
         except Exception as e:
             logging.error(f"データベースセッションエラー: {str(e)}")

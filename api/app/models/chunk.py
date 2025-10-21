@@ -45,7 +45,7 @@ class Chunk(Base):
         UniqueConstraint("file_id", "chunk_index", name="chunks_file_chunk_unique"),
     )
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     file_id = Column(UUID(as_uuid=True), ForeignKey("files.id", ondelete="CASCADE"), nullable=False)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     chunk_index = Column(Integer, nullable=False)
@@ -53,7 +53,7 @@ class Chunk(Base):
     metadata_json = Column('metadata', JSONB, nullable=False, server_default='{}')
     vector_id = Column(String(255), nullable=True)
     embedding = Column(Vector(1536), nullable=True)
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     
     # Relationships
     file = relationship("File", back_populates="chunks")

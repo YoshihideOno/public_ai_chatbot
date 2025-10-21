@@ -16,4 +16,4 @@ class AuditLog(Base):
     ip_address = Column(INET, nullable=False)
     user_agent = Column(Text, nullable=True)
     details = Column(JSONB, nullable=False, server_default='{}')
-    created_at = Column(DateTime(timezone=False), nullable=False, server_default=func.current_timestamp())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

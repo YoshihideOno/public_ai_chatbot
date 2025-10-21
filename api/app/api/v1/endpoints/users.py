@@ -17,7 +17,7 @@ from app.models.user import UserRole
 router = APIRouter()
 
 
-@router.get("/me", response_model=User)
+@router.get("/me", response_model=None)
 async def get_current_user_info(
     current_user: User = Depends(get_current_active_user)
 ):
@@ -25,7 +25,7 @@ async def get_current_user_info(
     return current_user
 
 
-@router.put("/me", response_model=User)
+@router.put("/me", response_model=None)
 async def update_current_user(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_active_user),
@@ -95,7 +95,7 @@ async def get_users(
     return users
 
 
-@router.post("/", response_model=User)
+@router.post("/", response_model=None)
 async def create_user(
     user_data: UserCreate,
     current_user: User = Depends(require_admin_role),
@@ -140,7 +140,7 @@ async def create_user(
     return user
 
 
-@router.get("/{user_id}", response_model=User)
+@router.get("/{user_id}", response_model=None)
 async def get_user(
     user_id: int,
     current_user: User = Depends(require_admin_role),
@@ -168,7 +168,7 @@ async def get_user(
     return user
 
 
-@router.put("/{user_id}", response_model=User)
+@router.put("/{user_id}", response_model=None)
 async def update_user(
     user_id: int,
     user_update: UserUpdate,
