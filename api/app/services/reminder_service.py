@@ -23,6 +23,7 @@ from app.services.tenant_service import TenantService
 from app.services.email_service import EmailService
 from app.core.constants import ReminderSettings, SystemMessages
 from app.core.exceptions import BusinessLogicError
+from app.utils.common import DateTimeUtils
 from app.utils.logging import BusinessLogger, ErrorLogger, logger
 
 
@@ -307,7 +308,7 @@ class ReminderService:
                 reminder_type=reminder_type,
                 days_before_expiry=days_before_expiry,
                 message=message,
-                sent_at=datetime.utcnow() if is_sent else None,
+                sent_at=DateTimeUtils.now() if is_sent else None,
                 is_sent=is_sent,
                 error_message=error_message
             )
@@ -380,7 +381,7 @@ class ReminderService:
                 return False
             
             notification.is_read = True
-            notification.read_at = datetime.utcnow()
+            notification.read_at = DateTimeUtils.now()
             
             await self.db.commit()
             return True

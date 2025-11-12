@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import traceback
 from functools import wraps
 import asyncio
+from uuid import UUID
 from app.core.config import settings
 
 
@@ -44,10 +45,34 @@ class StructuredLogger:
             "environment": settings.ENVIRONMENT,
         }
         
-        # 追加フィールドをマージ
-        entry.update(kwargs)
+        # 追加フィールドをマージ（UUIDオブジェクトを文字列に変換）
+        serialized_kwargs = {}
+        for key, value in kwargs.items():
+            if isinstance(value, UUID):
+                serialized_kwargs[key] = str(value)
+            elif isinstance(value, dict):
+                # 辞書内のUUIDも変換
+                serialized_kwargs[key] = self._serialize_value(value)
+            elif isinstance(value, list):
+                # リスト内のUUIDも変換
+                serialized_kwargs[key] = [self._serialize_value(item) for item in value]
+            else:
+                serialized_kwargs[key] = value
+        
+        entry.update(serialized_kwargs)
         
         return entry
+    
+    def _serialize_value(self, value: Any) -> Any:
+        """値をJSONシリアライズ可能な形式に変換"""
+        if isinstance(value, UUID):
+            return str(value)
+        elif isinstance(value, dict):
+            return {k: self._serialize_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._serialize_value(item) for item in value]
+        else:
+            return value
     
     def info(self, message: str, **kwargs):
         """情報ログ"""
@@ -183,9 +208,21 @@ class SecurityLogger:
         activity: str,
         details: Dict[str, Any],
         tenant_id: Optional[str] = None,
+        request: Optional[Any] = None,
         **kwargs
     ):
-        """不審な活動ログ"""
+        """
+        不審な活動ログ
+        
+        引数:
+            user_id: ユーザーID
+            activity: 活動内容
+            details: 詳細情報
+            tenant_id: テナントID
+            request: FastAPIのRequestオブジェクト（監査ログ用）
+            **kwargs: 追加の詳細情報
+        """
+        # 構造化ログに出力
         logger.warning(
             "Suspicious Activity",
             event="suspicious_activity",
@@ -195,10 +232,154 @@ class SecurityLogger:
             tenant_id=tenant_id,
             **kwargs
         )
+        
+        # 監査ログテーブルに書き込み（非同期、エラーは無視）
+        if tenant_id:
+            import asyncio
+            try:
+                # イベントループが存在する場合はタスクを作成
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(
+                        BusinessLogger._write_audit_log(
+                            tenant_id=tenant_id,
+                            action=f"suspicious_activity_{activity}",
+                            resource_type="security",
+                            user_id=user_id,
+                            request=request,
+                            details={**(details or {}), **kwargs}
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        BusinessLogger._write_audit_log(
+                            tenant_id=tenant_id,
+                            action=f"suspicious_activity_{activity}",
+                            resource_type="security",
+                            user_id=user_id,
+                            request=request,
+                            details={**(details or {}), **kwargs}
+                        )
+                    )
+            except RuntimeError:
+                # イベントループが存在しない場合はスキップ
+                pass
+    
+    @staticmethod
+    def log_permission_denied(
+        user_id: str,
+        resource: str,
+        action: str,
+        tenant_id: Optional[str] = None,
+        request: Optional[Any] = None,
+        **kwargs
+    ):
+        """
+        権限拒否ログ
+        
+        引数:
+            user_id: ユーザーID
+            resource: リソースタイプ
+            action: アクション名
+            tenant_id: テナントID
+            request: FastAPIのRequestオブジェクト（監査ログ用）
+            **kwargs: 追加の詳細情報
+        """
+        # 構造化ログに出力
+        logger.warning(
+            "Permission Denied",
+            event="permission_denied",
+            user_id=user_id,
+            resource=resource,
+            action=action,
+            tenant_id=tenant_id,
+            **kwargs
+        )
+        
+        # 監査ログテーブルに書き込み（非同期、エラーは無視）
+        if tenant_id:
+            import asyncio
+            try:
+                # イベントループが存在する場合はタスクを作成
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(
+                        BusinessLogger._write_audit_log(
+                            tenant_id=tenant_id,
+                            action="permission_denied",
+                            resource_type=resource,
+                            user_id=user_id,
+                            request=request,
+                            details={"action": action, **kwargs}
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        BusinessLogger._write_audit_log(
+                            tenant_id=tenant_id,
+                            action="permission_denied",
+                            resource_type=resource,
+                            user_id=user_id,
+                            request=request,
+                            details={"action": action, **kwargs}
+                        )
+                    )
+            except RuntimeError:
+                # イベントループが存在しない場合はスキップ
+                pass
 
 
 class BusinessLogger:
     """ビジネスログクラス"""
+    
+    @staticmethod
+    async def _write_audit_log(
+        tenant_id: Optional[str],
+        action: str,
+        resource_type: str,
+        user_id: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        request: Optional[Any] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        """
+        監査ログをデータベースに書き込む（非同期）
+        
+        引数:
+            tenant_id: テナントID
+            action: アクション名
+            resource_type: リソースタイプ
+            user_id: ユーザーID
+            resource_id: リソースID
+            request: FastAPIのRequestオブジェクト
+            details: 追加の詳細情報
+        """
+        if not tenant_id:
+            # テナントIDがない場合はスキップ
+            return
+        
+        try:
+            from app.services.audit_log_service import AuditLogService
+            from app.core.database import AsyncSessionLocal
+            
+            async with AsyncSessionLocal() as db:
+                audit_service = AuditLogService(db)
+                await audit_service.create_audit_log(
+                    tenant_id=tenant_id,
+                    action=action,
+                    resource_type=resource_type,
+                    user_id=user_id,
+                    resource_id=resource_id,
+                    request=request,
+                    details=details
+                )
+        except Exception as e:
+            # エラーが発生してもログに記録するが、メイン処理は継続
+            logger.error(
+                f"監査ログの書き込みに失敗: action={action}, resource_type={resource_type}, "
+                f"tenant_id={tenant_id}, error={str(e)}",
+                exc_info=True
+            )
     
     @staticmethod
     def log_user_action(
@@ -206,9 +387,23 @@ class BusinessLogger:
         action: str,
         resource: str,
         tenant_id: Optional[str] = None,
+        request: Optional[Any] = None,
+        resource_id: Optional[str] = None,
         **kwargs
     ):
-        """ユーザーアクションログ"""
+        """
+        ユーザーアクションログ
+        
+        引数:
+            user_id: ユーザーID
+            action: アクション名
+            resource: リソースタイプ
+            tenant_id: テナントID
+            request: FastAPIのRequestオブジェクト（監査ログ用）
+            resource_id: リソースID（監査ログ用）
+            **kwargs: 追加の詳細情報
+        """
+        # 構造化ログに出力
         logger.info(
             "User Action",
             event="user_action",
@@ -218,15 +413,62 @@ class BusinessLogger:
             tenant_id=tenant_id,
             **kwargs
         )
+        
+        # 監査ログテーブルに書き込み（非同期、エラーは無視）
+        if tenant_id:
+            import asyncio
+            try:
+                # イベントループが存在する場合はタスクを作成
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(
+                        BusinessLogger._write_audit_log(
+                            tenant_id=tenant_id,
+                            action=action,
+                            resource_type=resource,
+                            user_id=user_id,
+                            resource_id=resource_id,
+                            request=request,
+                            details=kwargs if kwargs else None
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        BusinessLogger._write_audit_log(
+                            tenant_id=tenant_id,
+                            action=action,
+                            resource_type=resource,
+                            user_id=user_id,
+                            resource_id=resource_id,
+                            request=request,
+                            details=kwargs if kwargs else None
+                        )
+                    )
+            except RuntimeError:
+                # イベントループが存在しない場合はスキップ
+                pass
     
     @staticmethod
     def log_tenant_action(
         tenant_id: str,
         action: str,
         details: Dict[str, Any],
+        request: Optional[Any] = None,
+        user_id: Optional[str] = None,
         **kwargs
     ):
-        """テナントアクションログ"""
+        """
+        テナントアクションログ
+        
+        引数:
+            tenant_id: テナントID
+            action: アクション名
+            details: 詳細情報
+            request: FastAPIのRequestオブジェクト（監査ログ用）
+            user_id: ユーザーID（監査ログ用）
+            **kwargs: 追加の詳細情報
+        """
+        # 構造化ログに出力
         logger.info(
             "Tenant Action",
             event="tenant_action",
@@ -235,6 +477,37 @@ class BusinessLogger:
             details=details,
             **kwargs
         )
+        
+        # 監査ログテーブルに書き込み（非同期、エラーは無視）
+        import asyncio
+        try:
+            # イベントループが存在する場合はタスクを作成
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(
+                    BusinessLogger._write_audit_log(
+                        tenant_id=tenant_id,
+                        action=action,
+                        resource_type="tenant",
+                        user_id=user_id,
+                        request=request,
+                        details={**(details or {}), **kwargs}
+                    )
+                )
+            else:
+                loop.run_until_complete(
+                    BusinessLogger._write_audit_log(
+                        tenant_id=tenant_id,
+                        action=action,
+                        resource_type="tenant",
+                        user_id=user_id,
+                        request=request,
+                        details={**(details or {}), **kwargs}
+                    )
+                )
+        except RuntimeError:
+            # イベントループが存在しない場合はスキップ
+            pass
     
     @staticmethod
     def log_content_action(
@@ -242,9 +515,21 @@ class BusinessLogger:
         action: str,
         user_id: str,
         tenant_id: str,
+        request: Optional[Any] = None,
         **kwargs
     ):
-        """コンテンツアクションログ"""
+        """
+        コンテンツアクションログ
+        
+        引数:
+            content_id: コンテンツID
+            action: アクション名
+            user_id: ユーザーID
+            tenant_id: テナントID
+            request: FastAPIのRequestオブジェクト（監査ログ用）
+            **kwargs: 追加の詳細情報
+        """
+        # 構造化ログに出力
         logger.info(
             "Content Action",
             event="content_action",
@@ -254,6 +539,39 @@ class BusinessLogger:
             tenant_id=tenant_id,
             **kwargs
         )
+        
+        # 監査ログテーブルに書き込み（非同期、エラーは無視）
+        import asyncio
+        try:
+            # イベントループが存在する場合はタスクを作成
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(
+                    BusinessLogger._write_audit_log(
+                        tenant_id=tenant_id,
+                        action=action,
+                        resource_type="content",
+                        user_id=user_id,
+                        resource_id=content_id,
+                        request=request,
+                        details=kwargs if kwargs else None
+                    )
+                )
+            else:
+                loop.run_until_complete(
+                    BusinessLogger._write_audit_log(
+                        tenant_id=tenant_id,
+                        action=action,
+                        resource_type="content",
+                        user_id=user_id,
+                        resource_id=content_id,
+                        request=request,
+                        details=kwargs if kwargs else None
+                    )
+                )
+        except RuntimeError:
+            # イベントループが存在しない場合はスキップ
+            pass
 
 
 class PerformanceLogger:

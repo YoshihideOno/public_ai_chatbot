@@ -16,8 +16,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
+from uuid import UUID
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash, verify_password
@@ -26,7 +27,7 @@ from app.core.exceptions import (
     ValidationError, BusinessLogicError
 )
 from app.utils.logging import SecurityLogger, ErrorLogger, logger
-from app.utils.common import ValidationUtils
+from app.utils.common import ValidationUtils, DateTimeUtils
 
 
 class UserService:
@@ -51,12 +52,12 @@ class UserService:
         """
         self.db = db
 
-    async def get_by_id(self, user_id: int) -> Optional[User]:
+    async def get_by_id(self, user_id: Union[int, UUID, str]) -> Optional[User]:
         """
         ユーザーIDでユーザー情報を取得
         
         引数:
-            user_id: ユーザーの一意識別子
+            user_id: ユーザーの一意識別子（UUID、整数、または文字列）
             
         戻り値:
             User: ユーザー情報、存在しない場合はNone
@@ -65,7 +66,14 @@ class UserService:
             SQLAlchemyError: データベースエラー
         """
         try:
-            # UUID等の非整数IDも考慮し、存在チェックのみに留める
+            # UUID文字列の場合はUUIDオブジェクトに変換
+            if isinstance(user_id, str):
+                try:
+                    user_id = UUID(user_id)
+                except ValueError:
+                    logger.warning(f"無効なユーザーID形式: {user_id}")
+                    return None
+            
             if not user_id:
                 logger.warning(f"無効なユーザーID: {user_id}")
                 return None
@@ -74,6 +82,7 @@ class UserService:
                 select(User)
                 .options(selectinload(User.tenant))
                 .where(User.id == user_id)
+                .where(User.deleted_at.is_(None))
             )
             user = result.scalar_one_or_none()
             
@@ -109,6 +118,7 @@ class UserService:
                 select(User)
                 .options(selectinload(User.tenant))
                 .where(User.email == email)
+                .where(User.deleted_at.is_(None))
             )
             user = result.scalar_one_or_none()
             
@@ -146,6 +156,7 @@ class UserService:
                 select(User)
                 .options(selectinload(User.tenant))
                 .where(User.username == username)
+                .where(User.deleted_at.is_(None))
             )
             user = result.scalar_one_or_none()
             
@@ -182,6 +193,7 @@ class UserService:
             result = await self.db.execute(
                 select(User)
                 .options(selectinload(User.tenant))
+                .where(User.deleted_at.is_(None))
                 .offset(skip)
                 .limit(limit)
             )
@@ -219,6 +231,7 @@ class UserService:
                 select(User)
                 .options(selectinload(User.tenant))
                 .where(User.tenant_id == tenant_id)
+                .where(User.deleted_at.is_(None))
                 .offset(skip)
                 .limit(limit)
             )
@@ -257,7 +270,7 @@ class UserService:
             if not user_data.username or len(user_data.username) < 3 or len(user_data.username) > 20:
                 raise ValidationError("ユーザー名は3-20文字の英数字とアンダースコアのみ使用可能です")
             
-            # 重複チェック（単一クエリで実行）
+            # 重複チェック（削除済みは除外、deleted_at IS NULLのみチェック）
             from sqlalchemy import or_
             existing_user = await self.db.execute(
                 select(User).where(
@@ -265,11 +278,29 @@ class UserService:
                         User.email == user_data.email,
                         User.username == user_data.username
                     )
-                )
+                ).where(User.deleted_at.is_(None))
             )
             existing = existing_user.scalar_one_or_none()
             
             if existing:
+                # 削除済み（deleted_at IS NOT NULL）の場合は重複として扱わない（新規作成可能）
+                # deleted_at IS NULL AND is_active = False の場合は再有効化
+                if not existing.is_active:
+                    existing.email = user_data.email
+                    existing.username = user_data.username
+                    existing.hashed_password = get_password_hash(user_data.password)
+                    existing.role = user_data.role
+                    existing.tenant_id = user_data.tenant_id
+                    existing.is_active = True
+                    existing.is_verified = False
+                    existing.deleted_at = None  # 念のためNULLに設定
+                    await self.db.commit()
+                    await self.db.refresh(existing)
+                    logger.info(
+                        f"ユーザー操作: user_id={existing.id}, action=reactivate_user, resource=user, tenant_id={existing.tenant_id}"
+                    )
+                    return existing
+                # アクティブユーザーの重複はエラー
                 if existing.email == user_data.email:
                     SecurityLogger.log_suspicious_activity(
                         None,
@@ -300,8 +331,9 @@ class UserService:
             )
             
             self.db.add(user)
-            # トランザクション内ではcommitしない
-            await self.db.flush()  # flushでIDを取得
+            # 永続化
+            await self.db.flush()  # ID採番
+            await self.db.commit()
             await self.db.refresh(user)
             
             logger.info(
@@ -316,7 +348,7 @@ class UserService:
             ErrorLogger.log_exception(e, {"operation": "create_user"})
             raise
 
-    async def update_user(self, user_id: int, user_update: UserUpdate) -> Optional[User]:
+    async def update_user(self, user_id: Union[int, UUID, str], user_update: UserUpdate) -> Optional[User]:
         """Update user information"""
         user = await self.get_by_id(user_id)
         if not user:
@@ -350,16 +382,17 @@ class UserService:
         if not user:
             return False
 
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = DateTimeUtils.now()
         await self.db.commit()
         return True
 
-    async def delete_user(self, user_id: int) -> bool:
-        """Delete user (soft delete by setting is_active=False)"""
+    async def delete_user(self, user_id: Union[int, UUID, str]) -> bool:
+        """Delete user (soft delete by setting deleted_at and is_active=False)"""
         user = await self.get_by_id(user_id)
         if not user:
             return False
 
+        user.deleted_at = DateTimeUtils.now()
         user.is_active = False
         await self.db.commit()
         return True

@@ -20,6 +20,7 @@ from sqlalchemy import select, and_
 from app.models.verification_token import VerificationToken
 from app.models.user import User
 from app.utils.logging import logger
+from app.utils.common import DateTimeUtils
 
 
 class TokenService:
@@ -72,7 +73,7 @@ class TokenService:
         hashed_token = TokenService.hash_token(plain_token)
         
         # 有効期限を設定
-        expires_at = datetime.utcnow() + timedelta(hours=expires_hours)
+        expires_at = DateTimeUtils.now() + timedelta(hours=expires_hours)
         
         # 新しいトークンを作成
         verification_token = VerificationToken(
@@ -115,7 +116,7 @@ class TokenService:
                 VerificationToken.token == hashed_token,
                 VerificationToken.token_type == token_type,
                 VerificationToken.is_used == False,
-                VerificationToken.expires_at > datetime.utcnow()
+                VerificationToken.expires_at > DateTimeUtils.now()
             )
         )
         
@@ -184,7 +185,7 @@ class TokenService:
             int: 削除されたトークン数
         """
         stmt = select(VerificationToken).where(
-            VerificationToken.expires_at < datetime.utcnow()
+            VerificationToken.expires_at < DateTimeUtils.now()
         )
         
         result = await db.execute(stmt)

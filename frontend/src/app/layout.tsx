@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ConditionalLayout } from '@/components/layout/ConditionalLayout';
+import { ChatWidget } from '@/components/widget/ChatWidget';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RAG AI Platform",
+  title: "RAG AI Chatbot Platform",
   description: "AI-powered RAG chatbot platform",
 };
 
@@ -34,6 +35,7 @@ export default function RootLayout({
             {children}
           </ConditionalLayout>
         </AuthProvider>
+        <ChatWidget />
       </body>
     </html>
   );

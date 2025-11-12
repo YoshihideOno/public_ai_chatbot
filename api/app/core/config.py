@@ -88,15 +88,21 @@ class Settings(BaseSettings):
     # Timezone
     TIMEZONE: str = "Asia/Tokyo"
     
+    # Storage
+    STORAGE_LOCAL_PATH: str = "/app/uploads"
+    BLOB_READ_WRITE_TOKEN: Optional[str] = None
+    
     class Config:
         """
         設定クラスの設定
         
         Pydanticの設定を定義します。
         env_fileで環境変数ファイルを指定し、case_sensitiveで大文字小文字を区別します。
+        extra = "ignore"で未定義の環境変数を無視します。
         """
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # 未定義の環境変数を無視
 
     def validate_settings(self) -> bool:
         """

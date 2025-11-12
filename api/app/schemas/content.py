@@ -2,6 +2,7 @@ from pydantic import BaseModel, validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 
 class FileType(str, Enum):
@@ -118,6 +119,63 @@ class ContentInDB(ContentBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
+    @validator('id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+    
+    @validator('tenant_id', pre=True)
+    def convert_tenant_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+    
+    @validator('content_type', pre=True)
+    def map_file_type(cls, v):
+        """file_typeをcontent_typeにマッピング"""
+        # Fileモデルから来る場合はfile_type属性を読み取る
+        if hasattr(v, 'value'):
+            return v.value
+        return v
+    
+    @validator('metadata', pre=True)
+    def map_metadata_json(cls, v):
+        """metadata_jsonをmetadataにマッピング"""
+        # 既に辞書の場合はそのまま返す
+        if isinstance(v, dict):
+            return v
+        # JSONBカラムから来る場合はそのまま返す（既に辞書のはず）
+        if v is None:
+            return {}
+        return v
+    
+    @validator('file_size', pre=True)
+    def map_size_bytes(cls, v):
+        """size_bytesをfile_sizeにマッピング"""
+        return v
+    
+    @classmethod
+    def from_orm(cls, obj):
+        """FileモデルからContentInDBへの変換"""
+        data = {
+            'id': str(obj.id),
+            'tenant_id': str(obj.tenant_id),
+            'title': obj.title,
+            'content_type': obj.file_type.value if obj.file_type else None,
+            'description': obj.description,
+            'tags': obj.tags if obj.tags else [],
+            'metadata': obj.metadata_json if obj.metadata_json else {},
+            'file_name': obj.file_name,
+            'file_size': obj.size_bytes,
+            'status': obj.status.value if obj.status else None,
+            'uploaded_at': obj.uploaded_at,
+            'indexed_at': obj.indexed_at,
+            'created_at': obj.created_at,
+            'updated_at': obj.updated_at,
+        }
+        return cls(**data)
+    
     class Config:
         from_attributes = True
 
@@ -178,6 +236,24 @@ class ChunkInDB(ChunkBase):
     tenant_id: str
     chunk_index: int
     created_at: datetime
+    
+    @validator('id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+    
+    @validator('file_id', pre=True)
+    def convert_file_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+    
+    @validator('tenant_id', pre=True)
+    def convert_tenant_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
     
     class Config:
         from_attributes = True

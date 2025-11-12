@@ -32,21 +32,33 @@ class ChunkRepository(BaseRepository):
         return [(r[0], float(r[1])) for r in rows]
 
     async def search_vector_l2(self, tenant_id: str, embedding: list[float], limit: int = 20) -> Sequence[tuple[str, float]]:
-        """Vector similarity search using L2 distance."""
+        """
+        ベクトル類似度検索（L2距離を使用）
+        
+        引数:
+            tenant_id: テナントID
+            embedding: 検索用の埋め込みベクトル
+            limit: 返却する結果の最大数
+        
+        戻り値:
+            Sequence[tuple[str, float]]: (チャンクID, 距離)のタプルのリスト（距離が小さい順）
+        """
         await self.set_tenant_context(tenant_id)
         stmt = text(
             """
             SELECT id::text, (embedding <-> :emb) AS dist
             FROM chunks
             WHERE embedding IS NOT NULL
+              AND tenant_id = :tid
             ORDER BY embedding <-> :emb
             LIMIT :limit
             """
         ).bindparams(
             bindparam("emb", type_=Chunk.embedding.type),
+            bindparam("tid", type_=Chunk.tenant_id.type),
             bindparam("limit", type_=Integer),
         )
-        res = await self.session.execute(stmt, {"emb": embedding, "limit": limit})
+        res = await self.session.execute(stmt, {"emb": embedding, "tid": tenant_id, "limit": limit})
         rows = res.all()
         return [(r[0], float(r[1])) for r in rows]
 

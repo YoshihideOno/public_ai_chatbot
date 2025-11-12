@@ -186,6 +186,10 @@ class StorageStats(BaseModel):
     total_chunks: int = 0
     storage_limit_mb: int = 100
     usage_percentage: float = 0.0
+    # ステータス別件数
+    indexed_files: int = 0
+    processing_files: int = 0
+    failed_files: int = 0
     
     @validator('total_files')
     def validate_total_files(cls, v):
@@ -203,6 +207,24 @@ class StorageStats(BaseModel):
     def validate_total_chunks(cls, v):
         if v < 0:
             raise ValueError('総チャンク数は0以上である必要があります')
+        return v
+
+    @validator('indexed_files')
+    def validate_indexed_files(cls, v):
+        if v < 0:
+            raise ValueError('インデックス済みファイル数は0以上である必要があります')
+        return v
+
+    @validator('processing_files')
+    def validate_processing_files(cls, v):
+        if v < 0:
+            raise ValueError('処理中ファイル数は0以上である必要があります')
+        return v
+
+    @validator('failed_files')
+    def validate_failed_files(cls, v):
+        if v < 0:
+            raise ValueError('失敗ファイル数は0以上である必要があります')
         return v
 
 

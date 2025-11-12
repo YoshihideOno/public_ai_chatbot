@@ -65,6 +65,12 @@ class TenantInfo(BaseModel):
     plan: str
     status: str
     
+    @validator('id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+    
     class Config:
         from_attributes = True
 

@@ -2,6 +2,7 @@ from pydantic import BaseModel, validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 import re
 
 
@@ -84,12 +85,38 @@ class TenantInDB(TenantBase):
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     
+    @validator('id', pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+    
     class Config:
         from_attributes = True
 
 
 class Tenant(TenantInDB):
     pass
+
+
+class TenantPublic(TenantBase):
+    """
+    外部公開用のテナントスキーマ（機微情報を含まない）
+    - api_key は含めない
+    """
+    id: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+
+    @validator('id', pre=True)
+    def convert_uuid_to_str_public(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+
+    class Config:
+        from_attributes = True
 
 
 class TenantWithUsers(Tenant):
@@ -111,23 +138,42 @@ class TenantStats(BaseModel):
 
 
 class TenantSettings(BaseModel):
-    default_model: str = "gpt-4"
+    default_model: Optional[str] = None
+    embedding_model: Optional[str] = None
     chunk_size: int = 1024
     chunk_overlap: int = 200
     max_queries_per_day: int = 1000
     max_storage_mb: int = 100
     enable_api_access: bool = True
-    enable_webhook: bool = False
+    enable_webhook: bool = True
     webhook_url: Optional[str] = None
     temperature: float = 0.7
     max_tokens: int = 500
     
     @validator('default_model')
     def validate_default_model(cls, v):
+        # Noneの場合はバリデーションをスキップ（未選択の場合）
+        if v is None:
+            return v
         # 利用可能なモデル一覧（LLMServiceから取得）
         available_models = [
-            "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
-            "claude-3-opus", "claude-3-sonnet", "claude-3-haiku",
+            "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "gpt-4o", "gpt-4o-mini",
+            "claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3-5-sonnet",
+            "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro", "gemini-1.5-flash"
+        ]
+        if v not in available_models:
+            raise ValueError(f'サポートされていないモデル: {v}')
+        return v
+    
+    @validator('embedding_model')
+    def validate_embedding_model(cls, v):
+        # Noneの場合はバリデーションをスキップ（未選択の場合）
+        if v is None:
+            return v
+        # 利用可能なモデル一覧（LLMServiceから取得）
+        available_models = [
+            "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo", "gpt-4o", "gpt-4o-mini",
+            "claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3-5-sonnet",
             "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro", "gemini-1.5-flash"
         ]
         if v not in available_models:

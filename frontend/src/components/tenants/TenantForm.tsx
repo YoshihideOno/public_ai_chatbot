@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -27,7 +26,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { 
   ArrowLeft, 
   Save, 
-  Building2,
   Key,
   Copy,
   Download,
@@ -106,7 +104,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
       setIsLoading(true);
       const tenantData = await apiClient.getTenant(tenantId);
       setTenant(tenantData);
-      setApiKey(tenantData.api_key);
+      setApiKey(tenantData.api_key || '');
       
       // フォームに値を設定
       setValue('name', tenantData.name);
@@ -184,61 +182,6 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
     }
   };
 
-  const getPlanBadgeVariant = (plan: string) => {
-    switch (plan) {
-      case 'ENTERPRISE':
-        return 'destructive';
-      case 'PRO':
-        return 'default';
-      case 'BASIC':
-        return 'secondary';
-      case 'FREE':
-        return 'outline';
-      default:
-        return 'outline';
-    }
-  };
-
-  const getPlanLabel = (plan: string) => {
-    switch (plan) {
-      case 'FREE':
-        return 'Free';
-      case 'BASIC':
-        return 'Basic';
-      case 'PRO':
-        return 'Pro';
-      case 'ENTERPRISE':
-        return 'Enterprise';
-      default:
-        return plan;
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'default';
-      case 'SUSPENDED':
-        return 'secondary';
-      case 'DELETED':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'アクティブ';
-      case 'SUSPENDED':
-        return '停止中';
-      case 'DELETED':
-        return '削除済み';
-      default:
-        return status;
-    }
-  };
 
   const canEdit = currentUser?.role === 'PLATFORM_ADMIN';
 
@@ -284,155 +227,111 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
         </TabsList>
 
         <TabsContent value="basic">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>基本情報</CardTitle>
-                  <CardDescription>
-                    テナントの基本情報を設定します
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">テナント名</Label>
-                        <Input
-                          id="name"
-                          {...register('name')}
-                          disabled={isViewMode || !canEdit}
-                        />
-                        {errors.name && (
-                          <p className="text-sm text-red-600">{errors.name.message}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="domain">ドメイン</Label>
-                        <Input
-                          id="domain"
-                          {...register('domain')}
-                          disabled={isViewMode || !canEdit}
-                        />
-                        {errors.domain && (
-                          <p className="text-sm text-red-600">{errors.domain.message}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="plan">プラン</Label>
-                        <Select
-                          value={watchedPlan}
-                          onValueChange={(value) => setValue('plan', value as 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE')}
-                          disabled={isViewMode || !canEdit}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="プランを選択" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="FREE">Free</SelectItem>
-                            <SelectItem value="BASIC">Basic</SelectItem>
-                            <SelectItem value="PRO">Pro</SelectItem>
-                            <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {errors.plan && (
-                          <p className="text-sm text-red-600">{errors.plan.message}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="status">ステータス</Label>
-                        <Select
-                          value={watchedStatus}
-                          onValueChange={(value) => setValue('status', value as 'ACTIVE' | 'SUSPENDED' | 'DELETED')}
-                          disabled={isViewMode || !canEdit}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="ステータスを選択" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ACTIVE">アクティブ</SelectItem>
-                            <SelectItem value="SUSPENDED">停止中</SelectItem>
-                            <SelectItem value="DELETED">削除済み</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {errors.status && (
-                          <p className="text-sm text-red-600">{errors.status.message}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {!isViewMode && canEdit && (
-                      <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => router.back()}>
-                          キャンセル
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                          <Save className="mr-2 h-4 w-4" />
-                          {isSubmitting ? '保存中...' : '保存'}
-                        </Button>
-                      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>基本情報</CardTitle>
+              <CardDescription>
+                テナントの基本情報を設定します
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">テナント名</Label>
+                    <Input
+                      id="name"
+                      {...register('name')}
+                      disabled={isViewMode || !canEdit}
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-red-600">{errors.name.message}</p>
                     )}
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
+                  </div>
 
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Building2 className="mr-2 h-5 w-5" />
-                    テナント情報
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-12 w-12 rounded bg-primary flex items-center justify-center">
-                      <Building2 className="h-6 w-6 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <div className="font-medium">{tenant?.name || '新規テナント'}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {tenant?.domain || 'ドメイン未設定'}
+                  <div className="space-y-2">
+                    <Label htmlFor="domain">ドメイン</Label>
+                    <Input
+                      id="domain"
+                      {...register('domain')}
+                      disabled={isViewMode || !canEdit}
+                    />
+                    {errors.domain && (
+                      <p className="text-sm text-red-600">{errors.domain.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plan">プラン</Label>
+                    <Select
+                      value={watchedPlan}
+                      onValueChange={(value) => setValue('plan', value as 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE')}
+                      disabled={isViewMode || !canEdit}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="プランを選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FREE">Free</SelectItem>
+                        <SelectItem value="BASIC">Basic</SelectItem>
+                        <SelectItem value="PRO">Pro</SelectItem>
+                        <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.plan && (
+                      <p className="text-sm text-red-600">{errors.plan.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status">ステータス</Label>
+                    <Select
+                      value={watchedStatus}
+                      onValueChange={(value) => setValue('status', value as 'ACTIVE' | 'SUSPENDED' | 'DELETED')}
+                      disabled={isViewMode || !canEdit}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="ステータスを選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACTIVE">アクティブ</SelectItem>
+                        <SelectItem value="SUSPENDED">停止中</SelectItem>
+                        <SelectItem value="DELETED">削除済み</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.status && (
+                      <p className="text-sm text-red-600">{errors.status.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                {tenant && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                    <div className="space-y-1">
+                      <Label className="text-sm text-muted-foreground">作成日</Label>
+                      <div className="text-sm">
+                        {format(new Date(tenant.created_at), 'yyyy/MM/dd', { locale: ja })}
                       </div>
                     </div>
                   </div>
+                )}
 
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">プラン</span>
-                      <Badge variant={getPlanBadgeVariant(watchedPlan)}>
-                        {getPlanLabel(watchedPlan)}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">ステータス</span>
-                      <Badge variant={getStatusBadgeVariant(watchedStatus)}>
-                        {getStatusLabel(watchedStatus)}
-                      </Badge>
-                    </div>
-
-                    {tenant && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">作成日</span>
-                        <span className="text-sm">
-                          {format(new Date(tenant.created_at), 'yyyy/MM/dd', { locale: ja })}
-                        </span>
-                      </div>
-                    )}
+                {!isViewMode && canEdit && (
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => router.back()}>
+                      キャンセル
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      <Save className="mr-2 h-4 w-4" />
+                      {isSubmitting ? '保存中...' : '保存'}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                )}
+              </form>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="settings">
@@ -574,7 +473,8 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copyToClipboard(apiKey)}
+                    onClick={() => copyToClipboard(apiKey || '')}
+                    disabled={!apiKey}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -608,7 +508,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
                 <Label>認証ヘッダー</Label>
                 <div className="p-3 bg-muted rounded-md">
                   <code className="text-sm">
-                    Authorization: Bearer {apiKey.slice(0, 20)}...
+                    Authorization: Bearer {apiKey ? `${apiKey.slice(0, 20)}...` : 'APIキーが設定されていません'}
                   </code>
                 </div>
               </div>
@@ -641,7 +541,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   
   ragChat('init', {
     tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
-    apiKey: '${apiKey.slice(0, 20)}...',
+    apiKey: '${apiKey ? `${apiKey.slice(0, 20)}...` : 'YOUR_API_KEY'}',
     theme: 'light',
     position: 'bottom-right'
   });
@@ -663,7 +563,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   
   ragChat('init', {
     tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
-    apiKey: '${apiKey.slice(0, 20)}...',
+    apiKey: '${apiKey || 'YOUR_API_KEY'}',
     theme: 'light',
     position: 'bottom-right'
   });

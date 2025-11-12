@@ -41,6 +41,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient, User } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { 
   Plus, 
   Search, 
@@ -70,6 +71,35 @@ export function UsersList() {
   const itemsPerPage = 20;
 
   const { user: currentUser } = useAuth();
+  const { canManageUsers, canDeleteUser } = usePermissions();
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    /**
+     * ユーザー一覧エクスポート
+     *
+     * 引数:
+     *   format: 'csv' | 'json'
+     * 戻り値:
+     *   Promise<void>
+     */
+    try {
+      const { blob, filename } = await apiClient.exportUsers({
+        format,
+        search: searchTerm || undefined,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `users.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export users:', err);
+      setError('エクスポートに失敗しました');
+    }
+  };
 
   const fetchUsers = async (page: number = 0) => {
     /**
@@ -95,7 +125,6 @@ export function UsersList() {
       setTotalPages(Math.ceil(usersData.length / itemsPerPage));
     } catch (err: unknown) {
       console.error('Failed to fetch users:', err);
-      const message = err instanceof Error ? err.message : '不明なエラーが発生しました';
       setError('ユーザー一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
@@ -106,7 +135,7 @@ export function UsersList() {
     fetchUsers(currentPage);
   }, [currentPage]);
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleDeleteUser = async (userId: string | number) => {
     /**
      * ユーザー削除処理
      * 
@@ -125,7 +154,7 @@ export function UsersList() {
 
     try {
       await apiClient.deleteUser(userId);
-      setUsers(users.filter(user => user.id !== userId));
+      setUsers(users.filter(user => String(user.id) !== String(userId)));
     } catch (err: unknown) {
       console.error('Failed to delete user:', err);
       setError('ユーザーの削除に失敗しました');
@@ -167,7 +196,7 @@ export function UsersList() {
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const canManageUsers = currentUser?.role === 'PLATFORM_ADMIN' || currentUser?.role === 'TENANT_ADMIN';
+  // canManageUsers は usePermissions に集約
 
   if (isLoading) {
     return (
@@ -220,14 +249,30 @@ export function UsersList() {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setCurrentPage(0);
+              }}
+            >
               <Filter className="mr-2 h-4 w-4" />
-              フィルタ
+              リセット
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              エクスポート
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  エクスポート
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>形式を選択</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleExport('csv')}>CSVでエクスポート</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('json')}>JSONでエクスポート</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="rounded-md border">
@@ -297,12 +342,6 @@ export function UsersList() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>アクション</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/users/${user.id}`}>
-                                <UserIcon className="mr-2 h-4 w-4" />
-                                詳細表示
-                              </Link>
-                            </DropdownMenuItem>
                             {canManageUsers && (
                               <>
                                 <DropdownMenuItem asChild>
@@ -314,6 +353,7 @@ export function UsersList() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => handleDeleteUser(user.id)}
+                                  disabled={!canDeleteUser(user.role)}
                                   className="text-red-600"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />

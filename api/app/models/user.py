@@ -58,6 +58,7 @@ class User(Base):
         last_login_at: 最終ログイン日時
         created_at: 作成日時
         updated_at: 更新日時
+        deleted_at: 論理削除日時（NULLの場合は削除されていない）
     """
     __tablename__ = "users"
 
@@ -72,6 +73,7 @@ class User(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     tenant = relationship("Tenant", back_populates="users")

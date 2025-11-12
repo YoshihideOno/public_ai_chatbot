@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お問い合わせ - サンプルサイト</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+    }
+    
+    header {
+      background: #1976d2;
+      color: #fff;
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2rem;
+    }
+    
+    nav a {
+      color: #fff;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    
+    nav a:hover {
+      opacity: 0.8;
+    }
+    
+    main {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #1976d2;
+      margin-bottom: 1rem;
+    }
+    
+    .contact-form {
+      margin-top: 2rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    input, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+    
+    button {
+      background: #1976d2;
+      color: #fff;
+      padding: 0.75rem 2rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #1565c0;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+      background: #fff;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">サンプルサイト</div>
+      <ul>
+        <li><a href="index.html">ホーム</a></li>
+        <li><a href="about.html">概要</a></li>
+        <li><a href="contact.html">お問い合わせ</a></li>
+      </ul>
+    </nav>
+  </header>
+  
+  <main>
+    <h1>お問い合わせ</h1>
+    <p>ご質問やお問い合わせがございましたら、以下のフォームからお気軽にご連絡ください。</p>
+    <p>または、右下のチャットボタンからAIチャットボットに直接お問い合わせいただくこともできます。</p>
+    
+    <form class="contact-form" onsubmit="event.preventDefault(); alert('このフォームはデモ用です。実際の送信機能は実装されていません。');">
+      <div class="form-group">
+        <label for="name">お名前</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="email">メールアドレス</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="message">メッセージ</label>
+        <textarea id="message" name="message" required></textarea>
+      </div>
+      
+      <button type="submit">送信</button>
+    </form>
+  </main>
+  
+  <footer>
+    <p>&copy; 2024 サンプルサイト. All rights reserved.</p>
+  </footer>
+
+  <!-- チャットウィジェット埋め込みコード -->
+  <script>
+    (function(w,d,s,o,f,js,fjs){
+      w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
+      js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
+      js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
+    }(window,document,'script','ragChat','http://localhost:3001/widget.js'));
+    
+    ragChat('init', {
+      tenantId: '07891daa-f1d3-4715-a592-a5dcf5ac7ec4',
+      apiKey: 'VGinl0hQnhRIcyCwooRft1zuCh6snRDUZnkoNjkyqvl2jqBeCGQTrkm1Np6nGLaI',
+      apiBaseUrl: 'http://localhost:8000/api/v1',
+      theme: 'light',
+      position: 'bottom-right'
+    });
+  </script>
+</body>
+</html>
+

@@ -26,8 +26,8 @@ from app.schemas.tenant import (
     TenantApiKey, TenantEmbedSnippet
 )
 from app.services.user_service import UserService
-from app.utils.common import StringUtils, ValidationUtils
-from app.utils.logging import BusinessLogger, SecurityLogger
+from app.utils.common import StringUtils, ValidationUtils, DateTimeUtils
+from app.utils.logging import BusinessLogger, SecurityLogger, logger
 
 
 class TenantService:
@@ -103,8 +103,8 @@ class TenantService:
             SQLAlchemyError: データベースエラー
         """
         try:
-            # APIキーのバリデーション
-            if not ValidationUtils.is_valid_api_key(api_key):
+            # APIキーの簡易バリデーション（形式チェックは長さのみ）
+            if not api_key or len(api_key.strip()) < 16:
                 SecurityLogger.warning(f"無効なAPIキー形式: {api_key[:10]}...")
                 return None
                 
@@ -115,7 +115,11 @@ class TenantService:
             )
             return result.scalar_one_or_none()
         except Exception as e:
-            SecurityLogger.error(f"APIキー検索エラー: {str(e)}")
+            logger.error(
+                "APIキー検索エラー",
+                error=str(e),
+                api_key_prefix=api_key[:10] + "..." if api_key else None
+            )
             raise
 
     async def get_all_tenants(
@@ -164,10 +168,24 @@ class TenantService:
         
         update_data = tenant_update.dict(exclude_unset=True)
         
+        # settingsが含まれている場合は、既存の設定とマージ
+        if 'settings' in update_data:
+            current_settings = dict(tenant.settings) if tenant.settings else {}
+            new_settings = update_data.pop('settings')
+            if new_settings is not None:
+                # 既存の設定とマージ（部分更新）
+                current_settings.update(new_settings)
+                # None値のキーを削除
+                for key in list(current_settings.keys()):
+                    if current_settings[key] is None:
+                        del current_settings[key]
+                tenant.settings = current_settings
+        
+        # その他のフィールドを更新
         for field, value in update_data.items():
             setattr(tenant, field, value)
         
-        tenant.updated_at = datetime.utcnow()
+        tenant.updated_at = DateTimeUtils.now()
         
         await self.db.commit()
         await self.db.refresh(tenant)
@@ -187,7 +205,7 @@ class TenantService:
             return False
         
         tenant.status = "DELETED"
-        tenant.deleted_at = datetime.utcnow()
+        tenant.deleted_at = DateTimeUtils.now()
         
         await self.db.commit()
         
@@ -207,7 +225,7 @@ class TenantService:
         
         new_api_key = StringUtils.generate_api_key("pk_live")
         tenant.api_key = new_api_key
-        tenant.updated_at = datetime.utcnow()
+        tenant.updated_at = DateTimeUtils.now()
         
         await self.db.commit()
         
@@ -254,20 +272,78 @@ class TenantService:
         )
 
     async def update_tenant_settings(self, tenant_id: str, settings: TenantSettings) -> bool:
-        """テナント設定更新"""
+        """
+        テナント設定更新
+        
+        部分更新をサポートします。指定されたフィールドのみを更新し、
+        None値のフィールドは既存の設定から削除します。
+        """
         tenant = await self.get_by_id(tenant_id)
         if not tenant:
             return False
         
-        tenant.settings = settings.dict()
-        tenant.updated_at = datetime.utcnow()
+        # 既存の設定を取得（空の場合は空辞書）
+        current_settings = tenant.settings if tenant.settings else {}
+        
+        # 指定されたフィールドのみを更新（exclude_unset=Trueでデフォルト値で埋められないようにする）
+        updated_settings = settings.dict(exclude_unset=True, exclude_none=False)
+        
+        # 既存の設定とマージ
+        current_settings.update(updated_settings)
+        
+        # None値（未選択の場合）はキーを削除
+        for key in list(current_settings.keys()):
+            if current_settings[key] is None:
+                del current_settings[key]
+        
+        tenant.settings = current_settings
+        tenant.updated_at = DateTimeUtils.now()
         
         await self.db.commit()
         
         BusinessLogger.log_tenant_action(
             tenant_id,
             "settings_updated",
-            {"settings": settings.dict()}
+            {"settings": current_settings}
+        )
+        
+        return True
+
+    async def update_tenant_settings_dict(self, tenant_id: str, settings: Dict[str, Any]) -> bool:
+        """
+        テナント設定更新（Dict形式）
+        
+        部分更新をサポートします。指定されたフィールドのみを更新し、
+        None値のフィールドは既存の設定から削除します。
+        """
+        tenant = await self.get_by_id(tenant_id)
+        if not tenant:
+            return False
+        
+        # 既存の設定を取得（空の場合は空辞書）
+        # 新しい辞書オブジェクトとして作成（SQLAlchemyの変更検知のため）
+        current_settings = dict(tenant.settings) if tenant.settings else {}
+        
+        # 送信されたフィールドのみを更新
+        current_settings.update(settings)
+        
+        # None値（未選択の場合）はキーを削除
+        for key in list(current_settings.keys()):
+            if current_settings[key] is None:
+                del current_settings[key]
+        
+        # 新しい辞書オブジェクトとして割り当て（SQLAlchemyが変更を検知できるように）
+        tenant.settings = current_settings
+        tenant.updated_at = DateTimeUtils.now()
+        
+        # 明示的にフラッシュして変更を確認
+        await self.db.flush()
+        await self.db.commit()
+        
+        BusinessLogger.log_tenant_action(
+            tenant_id,
+            "settings_updated",
+            {"settings": current_settings}
         )
         
         return True
@@ -327,9 +403,26 @@ class TenantService:
 
     async def generate_embed_snippet(self, tenant_id: str) -> Optional[TenantEmbedSnippet]:
         """埋め込みスニペット生成"""
+        from app.utils.logging import logger
+        
         tenant = await self.get_by_id(tenant_id)
         if not tenant:
+            logger.error(f"テナントが見つかりません: tenant_id={tenant_id}")
             return None
+        
+        # APIキーが存在しない場合はエラー
+        if not tenant.api_key:
+            logger.error(f"テナントのAPIキーが設定されていません: tenant_id={tenant_id}")
+            # APIキーを生成
+            new_api_key = await self.regenerate_api_key(tenant_id)
+            if not new_api_key:
+                logger.error(f"APIキーの生成に失敗しました: tenant_id={tenant_id}")
+                return None
+            # テナントを再取得
+            tenant = await self.get_by_id(tenant_id)
+            if not tenant or not tenant.api_key:
+                logger.error(f"APIキー生成後のテナント取得に失敗: tenant_id={tenant_id}")
+                return None
         
         snippet = f"""
 <script>
@@ -350,13 +443,23 @@ class TenantService:
         
         return TenantEmbedSnippet(
             snippet=snippet,
-            tenant_id=tenant.id,
+            tenant_id=str(tenant.id),
             api_key=tenant.api_key
         )
 
-    async def validate_tenant_access(self, tenant_id: str, user_id: int) -> bool:
+    async def validate_tenant_access(self, tenant_id: str, user_id) -> bool:
         """テナントアクセス権限チェック"""
+        from uuid import UUID
+        
         user_service = UserService(self.db)
+        # user_idがUUIDの場合はそのまま、文字列の場合はUUIDに変換
+        if isinstance(user_id, str):
+            try:
+                user_id = UUID(user_id)
+            except ValueError:
+                logger.error(f"無効なuser_id形式: {user_id}")
+                return False
+        
         user = await user_service.get_by_id(user_id)
         
         if not user:
@@ -367,7 +470,7 @@ class TenantService:
             return True
         
         # その他のユーザーは自分のテナントのみ
-        return user.tenant_id == tenant_id
+        return str(user.tenant_id) == str(tenant_id)
 
     async def get_tenant_usage_summary(self, tenant_id: str) -> Dict[str, Any]:
         """テナント使用量サマリ"""
@@ -409,7 +512,7 @@ class TenantService:
                 return True
             
             # ナレッジ登録日時を現在時刻に設定
-            tenant.knowledge_registered_at = datetime.utcnow()
+            tenant.knowledge_registered_at = DateTimeUtils.now()
             await self.db.commit()
             
             BusinessLogger.log_user_action(
@@ -464,7 +567,7 @@ class TenantService:
             # お試し利用期間の計算
             trial_period = ReminderSettings.get_trial_period()
             trial_end_date = tenant.knowledge_registered_at + trial_period
-            current_date = datetime.utcnow()
+            current_date = DateTimeUtils.now()
             
             # 期間満了チェック
             is_expired = current_date > trial_end_date

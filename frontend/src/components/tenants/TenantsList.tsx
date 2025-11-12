@@ -49,10 +49,7 @@ import {
   Trash2, 
   Building2,
   Filter,
-  Download,
-  Key,
-  Copy,
-  Eye
+  Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -104,30 +101,6 @@ export function TenantsList() {
     }
   };
 
-  const handleRegenerateApiKey = async (tenantId: string) => {
-    if (!confirm('APIキーを再発行しますか？既存のキーは無効になります。')) {
-      return;
-    }
-
-    try {
-      const response = await apiClient.regenerateApiKey(tenantId);
-      // テナント一覧を更新
-      await fetchTenants(currentPage);
-      alert(`新しいAPIキー: ${response.api_key}`);
-    } catch (err: unknown) {
-      console.error('Failed to regenerate API key:', err);
-      setError('APIキーの再発行に失敗しました');
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('クリップボードにコピーしました');
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
-    }
-  };
 
   const getPlanBadgeVariant = (plan: string) => {
     switch (plan) {
@@ -313,12 +286,6 @@ export function TenantsList() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>アクション</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/tenants/${tenant.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                詳細表示
-                              </Link>
-                            </DropdownMenuItem>
                             {canManageTenants && (
                               <>
                                 <DropdownMenuItem asChild>
@@ -326,14 +293,6 @@ export function TenantsList() {
                                     <Edit className="mr-2 h-4 w-4" />
                                     編集
                                   </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => copyToClipboard(tenant.api_key)}>
-                                  <Copy className="mr-2 h-4 w-4" />
-                                  APIキーをコピー
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleRegenerateApiKey(tenant.id)}>
-                                  <Key className="mr-2 h-4 w-4" />
-                                  APIキー再発行
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem

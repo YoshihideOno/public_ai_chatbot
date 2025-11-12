@@ -16,7 +16,7 @@ FastAPIのHTTPExceptionを拡張し、エラーコード、詳細情報、適切
 
 from fastapi import HTTPException, status
 from typing import Optional, Dict, Any
-from app.utils.logging import BusinessLogger, SecurityLogger
+from app.utils.logging import BusinessLogger, SecurityLogger, logger
 
 
 class CustomHTTPException(HTTPException):
@@ -60,7 +60,7 @@ class CustomHTTPException(HTTPException):
         self.error_details = error_details
         
         # エラーログの出力
-        BusinessLogger.error(f"HTTP例外発生: {error_code} - {detail}")
+        logger.error(f"HTTP例外発生: {error_code} - {detail}")
 
 
 class AuthenticationError(CustomHTTPException):
@@ -87,7 +87,7 @@ class AuthenticationError(CustomHTTPException):
             error_code="AUTHENTICATION_ERROR",
             headers={"WWW-Authenticate": "Bearer"}
         )
-        SecurityLogger.warning(f"認証エラー: {detail}")
+        logger.warning(f"認証エラー: {detail}")
 
 
 class AuthorizationError(CustomHTTPException):
@@ -113,7 +113,7 @@ class AuthorizationError(CustomHTTPException):
             detail=detail,
             error_code="AUTHORIZATION_ERROR"
         )
-        SecurityLogger.warning(f"認可エラー: {detail}")
+        logger.warning(f"認可エラー: {detail}")
 
 
 class ValidationError(CustomHTTPException):
@@ -141,7 +141,7 @@ class ValidationError(CustomHTTPException):
             error_code="VALIDATION_ERROR",
             error_details=error_details
         )
-        BusinessLogger.warning(f"バリデーションエラー: {detail}")
+        logger.warning(f"バリデーションエラー: {detail}")
 
 
 class ResourceNotFoundError(CustomHTTPException):
@@ -167,7 +167,7 @@ class ResourceNotFoundError(CustomHTTPException):
             detail=f"{resource} が見つかりません",
             error_code="RESOURCE_NOT_FOUND"
         )
-        BusinessLogger.info(f"リソース未発見: {resource}")
+        logger.info(f"リソース未発見: {resource}")
 
 
 class ConflictError(CustomHTTPException):
@@ -193,7 +193,7 @@ class ConflictError(CustomHTTPException):
             detail=detail,
             error_code="CONFLICT_ERROR"
         )
-        BusinessLogger.warning(f"リソース競合: {detail}")
+        logger.warning(f"リソース競合: {detail}")
 
 
 class RateLimitError(CustomHTTPException):
@@ -245,7 +245,7 @@ class BusinessLogicError(CustomHTTPException):
             detail=detail,
             error_code="BUSINESS_LOGIC_ERROR"
         )
-        BusinessLogger.error(f"ビジネスロジックエラー: {detail}")
+        logger.error(f"ビジネスロジックエラー: {detail}")
 
 
 # 特定のシナリオ用のエラークラス

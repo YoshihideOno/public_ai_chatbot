@@ -80,23 +80,27 @@ def upgrade() -> None:
                    type_=sa.DateTime(timezone=True),
                    existing_nullable=False)
     
-    # indexing_jobs テーブル
-    op.alter_column('indexing_jobs', 'started_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=True)
-    op.alter_column('indexing_jobs', 'completed_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=True)
-    op.alter_column('indexing_jobs', 'created_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
-    op.alter_column('indexing_jobs', 'updated_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
+    # indexing_jobs テーブル（廃止されたテーブルのため、存在する場合のみ処理）
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'indexing_jobs' in inspector.get_table_names():
+        op.alter_column('indexing_jobs', 'started_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=True)
+        op.alter_column('indexing_jobs', 'completed_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=True)
+        op.alter_column('indexing_jobs', 'created_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
+        op.alter_column('indexing_jobs', 'updated_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
     
     # billing_info テーブル
     op.alter_column('billing_info', 'current_period_start',
@@ -199,23 +203,27 @@ def downgrade() -> None:
                    type_=sa.DateTime(timezone=False),
                    existing_nullable=False)
     
-    # indexing_jobs テーブル
-    op.alter_column('indexing_jobs', 'started_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=True)
-    op.alter_column('indexing_jobs', 'completed_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=True)
-    op.alter_column('indexing_jobs', 'created_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
-    op.alter_column('indexing_jobs', 'updated_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
+    # indexing_jobs テーブル（廃止されたテーブルのため、存在する場合のみ処理）
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'indexing_jobs' in inspector.get_table_names():
+        op.alter_column('indexing_jobs', 'started_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=True)
+        op.alter_column('indexing_jobs', 'completed_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=True)
+        op.alter_column('indexing_jobs', 'created_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
+        op.alter_column('indexing_jobs', 'updated_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
     
     # billing_info テーブル
     op.alter_column('billing_info', 'current_period_start',

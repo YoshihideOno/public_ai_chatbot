@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "パスワードリセット - RAG AI Platform",
-  description: "RAG AI Platform パスワードリセット",
+  title: "パスワードリセット - RAG AI Chatbot Platform",
+  description: "RAG AI Chatbot Platform パスワードリセット",
 };
 
 export default function PasswordResetLayout({

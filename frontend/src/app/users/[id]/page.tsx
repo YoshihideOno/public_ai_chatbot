@@ -10,7 +10,7 @@ interface UserDetailPageProps {
 export default function UserDetailPage({ params }: UserDetailPageProps) {
   return (
     <ProtectedRoute>
-      <UserForm userId={parseInt(params.id)} mode="view" />
+      <UserForm userId={params.id} mode="view" />
     </ProtectedRoute>
   );
 }

@@ -10,7 +10,7 @@ interface EditUserPageProps {
 export default function EditUserPage({ params }: EditUserPageProps) {
   return (
     <ProtectedRoute>
-      <UserForm userId={parseInt(params.id)} mode="edit" />
+      <UserForm userId={params.id} mode="edit" />
     </ProtectedRoute>
   );
 }

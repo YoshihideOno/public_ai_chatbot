@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "ログイン - RAG AI Platform",
-  description: "RAG AI Platform にログイン",
+  title: "ログイン - RAG AI Chatbot Platform",
+  description: "RAG AI Chatbot Platform にログイン",
 };
 
 export default function LoginLayout({

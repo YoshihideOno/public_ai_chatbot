@@ -40,9 +40,10 @@ class Tenant(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     name = Column(String(255), nullable=False)
-    domain = Column(String(255), nullable=False)
+    domain = Column(String(255), nullable=False, unique=True)
     plan = Column(String(50), nullable=False, default="FREE")
     status = Column(String(50), nullable=False, default="ACTIVE")
+    api_key = Column(String(255), nullable=False, unique=True)
     settings = Column(JSONB, nullable=False, server_default='{}')
     knowledge_registered_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

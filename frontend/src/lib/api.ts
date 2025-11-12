@@ -16,7 +16,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // 型定義
 export interface User {
-  id: number;
+  id: string;
   email: string;
   username: string;
   role: 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'OPERATOR' | 'AUDITOR';
@@ -31,6 +31,9 @@ export interface TenantSettings {
   max_users?: number;
   max_contents?: number;
   max_storage_mb?: number;
+  // 追加: LLMモデル既定
+  default_model?: string | null; // 回答用モデル（nullは未選択を意味する）
+  embedding_model?: string | null; // 埋め込み用モデル（nullは未選択を意味する）
   features?: string[];
   custom_domain?: string;
   branding?: {
@@ -62,13 +65,16 @@ export interface Content {
   title: string;
   file_name: string;
   file_type: 'PDF' | 'HTML' | 'MD' | 'CSV' | 'TXT';
-  size_bytes: number;
+  content_type?: 'PDF' | 'HTML' | 'MD' | 'CSV' | 'TXT'; // API送信用
+  size_bytes?: number;
+  file_size?: number;
   status: 'UPLOADED' | 'PROCESSING' | 'INDEXED' | 'FAILED';
   description?: string;
   tags: string[];
   uploaded_at: string;
   indexed_at?: string;
   chunk_count?: number;
+  file_url?: string;
 }
 
 export interface ChatRequest {
@@ -147,57 +153,74 @@ export interface ApiError {
   };
 }
 
-export interface AdminRequest {
-  id: number;
-  user_id: number;
-  reason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  created_at: string;
-  reviewed_at?: string;
-  reviewed_by?: number;
-  review_comment?: string;
+export interface UsageStats {
+  tenant_id: string;
+  metric_type: string;
+  granularity: string;
+  start_date: string;
+  end_date: string;
+  total_queries: number;
+  unique_users: number;
+  avg_response_time_ms: number;
+  feedback_rate: number;
+  like_rate: number;
 }
 
-export interface UsageStats {
-  period: string;
-  total_requests: number;
-  total_tokens: number;
+export interface LlmUsageStats {
+  tenant_id: string;
+  model: string;
+  total_tokens_in: number;
+  total_tokens_out: number;
   total_cost: number;
-  active_users: number;
-  data_points: Array<{
-    date: string;
-    requests: number;
-    tokens: number;
-    cost: number;
-    users: number;
-  }>;
+  request_count: number;
+  avg_tokens_per_request: number;
 }
 
 export interface DashboardStats {
+  tenant_id: string;
   period: string;
-  overview: {
-    total_users: number;
-    total_tenants: number;
-    total_contents: number;
-    total_chats: number;
-  };
-  usage: {
-    requests_today: number;
-    requests_this_month: number;
-    tokens_today: number;
-    tokens_this_month: number;
-  };
-  revenue: {
-    monthly_revenue: number;
-    yearly_revenue: number;
-    growth_rate: number;
-  };
-  top_tenants: Array<{
+  usage_stats: UsageStats;
+  llm_usage: LlmUsageStats[];
+  storage_stats: {
     tenant_id: string;
-    tenant_name: string;
-    request_count: number;
-    revenue: number;
+    total_files: number;
+    total_size_mb: number;
+    total_chunks: number;
+    storage_limit_mb: number;
+    usage_percentage: number;
+  };
+  top_queries: Array<{
+    query: string;
+    count: number;
+    avg_response_time_ms: number;
+    like_rate: number;
   }>;
+  recent_activity: Array<{
+    type: string;
+    description: string;
+    timestamp: string;
+    details: Record<string, unknown>;
+  }>;
+}
+
+// コンテンツ統計（サマリー）
+export interface ContentStatsSummary {
+  total_files: number;
+  status_counts: Record<string, number>;
+  total_chunks: number;
+  total_size_mb: number;
+  file_types: Record<string, number>;
+}
+
+export interface RecentActivity {
+  id: string;
+  user_id?: string;
+  tenant_id?: string;
+  action: string;
+  entity_type?: string;
+  entity_id?: string;
+  message?: string;
+  created_at: string;
 }
 
 // APIクライアントクラス
@@ -217,16 +240,10 @@ export class ApiClient {
   private baseURL: string;
 
   constructor(baseURL?: string) {
-    // 環境に応じてベースURLを設定
-    if (baseURL) {
-      this.baseURL = baseURL;
-    } else if (typeof window !== 'undefined') {
-      // ブラウザ環境では環境変数または localhost を使用
-      this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-    } else {
-      // サーバーサイド環境では Docker サービス名を使用
-      this.baseURL = 'http://fastapi:8000';
-    }
+    // ベースURLは常にブラウザ到達可能なURLを優先
+    // SSRで初期化されても、NEXT_PUBLIC_API_BASE_URL もしくは localhost を使う
+    const browserBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    this.baseURL = baseURL || browserBase;
     
     this.client = axios.create({
       baseURL: `${this.baseURL}/api/v1`,
@@ -257,6 +274,12 @@ export class ApiClient {
       },
       async (error) => {
         if (error.response?.status === 401) {
+          // /auth/me へのリクエストの場合は、リダイレクトせずにエラーを返す
+          // （初期認証チェックでは、エラーを静かに処理するため）
+          if (error.config?.url?.includes('/auth/me')) {
+            return Promise.reject(error);
+          }
+          
           // トークン期限切れの場合、リフレッシュトークンで更新を試行
           const refreshToken = localStorage.getItem('refresh_token');
           if (refreshToken) {
@@ -323,16 +346,6 @@ export class ApiClient {
     return response.data;
   }
 
-  async requestAdminRole(reason: string): Promise<void> {
-    const response = await this.client.post('/auth/admin-request', { reason });
-    return response.data;
-  }
-
-  async getAdminRequests(): Promise<AdminRequest[]> {
-    const response = await this.client.get('/auth/admin-requests');
-    return response.data;
-  }
-
   async logout(): Promise<void> {
     await this.client.post('/auth/logout');
     localStorage.removeItem('access_token');
@@ -362,13 +375,18 @@ export class ApiClient {
     return response.data;
   }
 
+  async updateCurrentUser(userData: Partial<User>): Promise<User> {
+    const response = await this.client.put('/users/me', userData);
+    return response.data;
+  }
+
   // ユーザー管理
   async getUsers(skip: number = 0, limit: number = 100): Promise<User[]> {
     const response = await this.client.get(`/users/?skip=${skip}&limit=${limit}`);
     return response.data;
   }
 
-  async getUser(id: number): Promise<User> {
+  async getUser(id: string | number): Promise<User> {
     const response = await this.client.get(`/users/${id}`);
     return response.data;
   }
@@ -378,13 +396,32 @@ export class ApiClient {
     return response.data;
   }
 
-  async updateUser(id: number, userData: Partial<User>): Promise<User> {
+  async updateUser(id: string | number, userData: Partial<User>): Promise<User> {
     const response = await this.client.put(`/users/${id}`, userData);
     return response.data;
   }
 
-  async deleteUser(id: number): Promise<void> {
+  async deleteUser(id: string | number): Promise<void> {
     await this.client.delete(`/users/${id}`);
+  }
+
+  // ユーザーのエクスポート（CSV/JSON）
+  async exportUsers(params: { format: 'csv' | 'json'; search?: string; role?: User['role']; is_active?: boolean }): Promise<{ blob: Blob; filename?: string }> {
+    const query = new URLSearchParams();
+    query.set('format', params.format);
+    if (params.search) query.set('search', params.search);
+    if (params.role) query.set('role', params.role);
+    if (typeof params.is_active === 'boolean') query.set('is_active', String(params.is_active));
+    const response = await this.client.get(`/users/actions/export?${query.toString()}`, {
+      responseType: 'blob',
+    });
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    let filename: string | undefined;
+    if (disposition) {
+      const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/);
+      filename = decodeURIComponent((match?.[1] || match?.[2] || '').trim());
+    }
+    return { blob: response.data as Blob, filename };
   }
 
   // テナント管理
@@ -397,6 +434,11 @@ export class ApiClient {
 
   async getTenant(id: string): Promise<Tenant> {
     const response = await this.client.get(`/tenants/${id}`);
+    return response.data;
+  }
+
+  async getEmbedSnippet(tenantId: string): Promise<{ snippet: string; tenant_id: string; api_key: string }> {
+    const response = await this.client.get(`/tenants/${tenantId}/embed-snippet`);
     return response.data;
   }
 
@@ -434,7 +476,7 @@ export class ApiClient {
     return response.data;
   }
 
-  async createContent(contentData: Partial<Content>): Promise<Content> {
+  async createContent(contentData: Partial<Content>): Promise<{ id: string; status: string; message?: string } | Content> {
     const response = await this.client.post('/contents/', contentData);
     return response.data;
   }
@@ -463,6 +505,39 @@ export class ApiClient {
     return response.data.content;
   }
 
+  // ダウンロード（元ファイルバイナリ）
+  async downloadContent(id: string): Promise<{ blob: Blob; filename?: string }> {
+    const response = await this.client.get(`/contents/${id}/download`, {
+      responseType: 'blob',
+    });
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    let filename: string | undefined;
+    if (disposition) {
+      const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/);
+      filename = decodeURIComponent((match?.[1] || match?.[2] || '').trim());
+    }
+    return { blob: response.data as Blob, filename };
+  }
+
+  // エクスポート（CSV/JSON）
+  async exportContents(params: { fileType?: string; status?: string; search?: string; format: 'csv' | 'json' }): Promise<{ blob: Blob; filename?: string }> {
+    const query = new URLSearchParams();
+    query.set('format', params.format);
+    if (params.fileType) query.set('file_type', params.fileType);
+    if (params.status) query.set('status', params.status);
+    if (params.search) query.set('search', params.search);
+    const response = await this.client.get(`/contents/actions/export?${query.toString()}`, {
+      responseType: 'blob',
+    });
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    let filename: string | undefined;
+    if (disposition) {
+      const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/);
+      filename = decodeURIComponent((match?.[1] || match?.[2] || '').trim());
+    }
+    return { blob: response.data as Blob, filename };
+  }
+
   // チャット機能
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
     const response = await this.client.post('/chats', request);
@@ -483,6 +558,69 @@ export class ApiClient {
   async getDashboardStats(period: string = 'month'): Promise<DashboardStats> {
     const response = await this.client.get(`/stats/dashboard?period=${period}`);
     return response.data;
+  }
+
+  // クエリアナリティクス（再集計/取得）
+  async rebuildQueryAnalytics(params: { locale: string; period: 'today' | 'week' | 'month' | 'custom'; start_date?: string; end_date?: string; top_k?: number }): Promise<{ message: string }> {
+    const query = new URLSearchParams();
+    query.set('locale', params.locale);
+    query.set('period', params.period);
+    if (params.start_date) query.set('start_date', params.start_date);
+    if (params.end_date) query.set('end_date', params.end_date);
+    if (params.top_k) query.set('top_k', String(params.top_k));
+    const res = await this.client.post(`/query-analytics/rebuild?${query.toString()}`);
+    return res.data;
+  }
+
+  // コンテンツ統計サマリー
+  async getContentStatsSummary(): Promise<ContentStatsSummary> {
+    const response = await this.client.get('/contents/stats/summary');
+    return response.data;
+  }
+
+  // ========== APIキー / モデル ========== 
+  async getProvidersAndModels(): Promise<{ providers: Array<{ provider: string; models: string[] }> }> {
+    const res = await this.client.get('/api-keys/providers');
+    return res.data;
+  }
+
+  async getApiKeys(): Promise<{ api_keys: Array<{ id: string; tenant_id: string; provider: string; api_key_masked: string; model: string; is_active: boolean; created_at: string; updated_at?: string }>; total_count: number }> {
+    const res = await this.client.get('/api-keys/');
+    return res.data;
+  }
+
+  async createApiKey(payload: { provider: string; api_key: string; model: string }): Promise<{ id: string } & { tenant_id: string; provider: string; api_key_masked: string; model: string; is_active: boolean; created_at: string; updated_at?: string }> {
+    const res = await this.client.post('/api-keys/', payload);
+    return res.data;
+  }
+
+  async updateApiKey(
+    apiKeyId: string,
+    updateData: { is_active?: boolean; api_key?: string; model?: string }
+  ): Promise<{ id: string; tenant_id: string; provider: string; api_key_masked: string; model: string; is_active: boolean; created_at: string; updated_at?: string }> {
+    const res = await this.client.put(`/api-keys/${apiKeyId}`, updateData);
+    return res.data;
+  }
+
+  async verifyApiKey(apiKeyId: string): Promise<{ valid: boolean; provider: string; model: string; message?: string; error_code?: string }> {
+    const res = await this.client.post(`/api-keys/${apiKeyId}/verify`);
+    return res.data;
+  }
+
+  async verifyApiKeyInline(payload: { provider: string; model?: string; api_key: string }): Promise<{ valid: boolean; provider: string; model: string; message?: string; error_code?: string }> {
+    const res = await this.client.post('/api-keys/verify-inline', payload);
+    return res.data;
+  }
+
+  // テナント設定の取得/更新（自テナントはユーザー情報から取得している想定のため、ここでは汎用）
+  async updateTenantSettings(tenantId: string, settings: Partial<TenantSettings>): Promise<{ message: string } | Tenant> {
+    const res = await this.client.put(`/tenants/${tenantId}/settings`, settings);
+    return res.data;
+  }
+
+  async getRecentActivities(limit: number = 10): Promise<RecentActivity[]> {
+    const response = await this.client.get(`/audit-logs/recent?limit=${limit}`);
+    return (response.data?.activities ?? []) as RecentActivity[];
   }
 }
 

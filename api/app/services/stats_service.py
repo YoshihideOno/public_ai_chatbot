@@ -1,11 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc
+from sqlalchemy import select, func, and_, or_, desc, case
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, date
 from app.models.conversation import Conversation
 from app.models.usage_log import UsageLog
-from app.models.file import File
+from app.models.file import File, FileStatus
 from app.models.user import User
+from app.models.query_analytics import TopQueryAggregate
 from app.schemas.stats import (
     UsageStats, UsageTimeSeries, TopQuery, LLMUsageStats,
     LLMUsageTimeSeries, FeedbackStats, FeedbackAnalysis,
@@ -29,30 +30,54 @@ class StatsService:
     ) -> UsageStats:
         """利用統計取得"""
         try:
-            # 総質問数
-            total_queries_result = await self.db.execute(
-                select(func.count(Conversation.id))
-                .where(
-                    and_(
-                        Conversation.tenant_id == tenant_id,
-                        Conversation.created_at >= start_date,
-                        Conversation.created_at <= end_date
+            # プラットフォーム管理者の場合（tenant_id="system"）、全テナントの統計を取得
+            if tenant_id == "system":
+                # 総質問数（全テナント）
+                total_queries_result = await self.db.execute(
+                    select(func.count(Conversation.id))
+                    .where(
+                        and_(
+                            Conversation.created_at >= start_date,
+                            Conversation.created_at <= end_date
+                        )
                     )
                 )
-            )
+            else:
+                # 総質問数
+                total_queries_result = await self.db.execute(
+                    select(func.count(Conversation.id))
+                    .where(
+                        and_(
+                            Conversation.tenant_id == tenant_id,
+                            Conversation.created_at >= start_date,
+                            Conversation.created_at <= end_date
+                        )
+                    )
+                )
             total_queries = total_queries_result.scalar() or 0
             
             # ユニークユーザー数（セッションIDベース）
-            unique_users_result = await self.db.execute(
-                select(func.count(func.distinct(Conversation.session_id)))
-                .where(
-                    and_(
-                        Conversation.tenant_id == tenant_id,
-                        Conversation.created_at >= start_date,
-                        Conversation.created_at <= end_date
+            if tenant_id == "system":
+                unique_users_result = await self.db.execute(
+                    select(func.count(func.distinct(Conversation.session_id)))
+                    .where(
+                        and_(
+                            Conversation.created_at >= start_date,
+                            Conversation.created_at <= end_date
+                        )
                     )
                 )
-            )
+            else:
+                unique_users_result = await self.db.execute(
+                    select(func.count(func.distinct(Conversation.session_id)))
+                    .where(
+                        and_(
+                            Conversation.tenant_id == tenant_id,
+                            Conversation.created_at >= start_date,
+                            Conversation.created_at <= end_date
+                        )
+                    )
+                )
             unique_users = unique_users_result.scalar() or 0
             
             # 平均応答時間（仮の値）
@@ -63,7 +88,7 @@ class StatsService:
             like_rate = 0.65  # TODO: 実際の計算
             
             return UsageStats(
-                tenant_id=tenant_id,
+                tenant_id=tenant_id if tenant_id != "system" else "all",
                 metric_type="queries",
                 granularity=granularity,
                 start_date=start_date,
@@ -76,11 +101,8 @@ class StatsService:
             )
             
         except Exception as e:
-            PerformanceLogger.log_api_performance(
-                "get_usage_stats",
-                0,
-                tenant_id=tenant_id
-            )
+            from app.utils.logging import logger
+            logger.error(f"利用統計取得エラー: {str(e)}")
             raise
 
     async def get_usage_time_series(
@@ -144,43 +166,64 @@ class StatsService:
     ) -> List[TopQuery]:
         """よくある質問TOP取得"""
         try:
-            # TODO: 実際の集計処理を実装
-            # 現在は仮のデータを返す
-            
-            top_queries = [
-                TopQuery(
-                    query="返品方法を教えてください",
-                    count=89,
-                    like_rate=0.85,
-                    avg_response_time_ms=2800.0
-                ),
-                TopQuery(
-                    query="配送期間はどのくらいですか",
-                    count=67,
-                    like_rate=0.78,
-                    avg_response_time_ms=3200.0
-                ),
-                TopQuery(
-                    query="支払い方法を変更できますか",
-                    count=54,
-                    like_rate=0.72,
-                    avg_response_time_ms=2900.0
-                ),
-                TopQuery(
-                    query="注文をキャンセルしたいです",
-                    count=42,
-                    like_rate=0.68,
-                    avg_response_time_ms=3500.0
-                ),
-                TopQuery(
-                    query="問い合わせ先を教えてください",
-                    count=38,
-                    like_rate=0.91,
-                    avg_response_time_ms=2100.0
+            # まずは事前集計テーブルから取得（存在すれば利用）
+            # localeは現状未保持のため、テナント単位で期間一致の集計を参照
+            aggregates_result = await self.db.execute(
+                select(TopQueryAggregate)
+                .where(
+                    and_(
+                        TopQueryAggregate.tenant_id == tenant_id,
+                        TopQueryAggregate.period_start == start_date,
+                        TopQueryAggregate.period_end == end_date,
+                    )
                 )
+                .order_by(TopQueryAggregate.rank.asc())
+            )
+            aggregates = aggregates_result.scalars().all()
+            if aggregates:
+                return [
+                    TopQuery(
+                        query=a.query,
+                        count=a.count or 0,
+                        like_rate=float(a.like_rate or 0.0),
+                        avg_response_time_ms=float(a.avg_response_time_ms or 0.0),
+                    )
+                    for a in aggregates[:limit]
+                ]
+
+            # フォールバック: Conversationから簡易集計
+            fallback = await self.db.execute(
+                select(
+                    Conversation.user_input.label("query"),
+                    func.count(Conversation.id).label("count"),
+                    func.avg(Conversation.latency_ms).label("avg_response_time_ms"),
+                    func.avg(
+                        case(
+                            (Conversation.feedback.in_(["positive", "like", "LIKE", "POSITIVE"]), 1),
+                            else_=0,
+                        )
+                    ).label("like_rate"),
+                )
+                .where(
+                    and_(
+                        Conversation.tenant_id == tenant_id,
+                        Conversation.created_at >= start_date,
+                        Conversation.created_at <= end_date,
+                    )
+                )
+                .group_by(Conversation.user_input)
+                .order_by(desc("count"))
+            )
+            rows = fallback.fetchall()
+            return [
+                TopQuery(
+                    query=(row.query or "").strip()[:500],
+                    count=int(row.count or 0),
+                    like_rate=float(row.like_rate or 0.0),
+                    avg_response_time_ms=float(row.avg_response_time_ms or 0.0),
+                )
+                for row in rows[:limit]
             ]
-            
-            return top_queries[:limit]
             
         except Exception as e:
             PerformanceLogger.log_api_performance(
@@ -263,62 +306,158 @@ class StatsService:
     async def get_storage_stats(self, tenant_id: str) -> StorageStats:
         """ストレージ統計取得"""
         try:
-            # 総ファイル数
-            total_files_result = await self.db.execute(
-                select(func.count(File.id))
-                .where(
-                    and_(
-                        File.tenant_id == tenant_id,
-                        File.deleted_at.is_(None)
+            # プラットフォーム管理者の場合（tenant_id="system"）、全テナントの統計を取得
+            if tenant_id == "system":
+                # 総ファイル数（全テナント）
+                total_files_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(File.deleted_at.is_(None))
+                )
+                total_files = total_files_result.scalar() or 0
+                
+                # 総サイズ（全テナント）
+                total_size_result = await self.db.execute(
+                    select(func.sum(File.size_bytes))
+                    .where(File.deleted_at.is_(None))
+                )
+                total_size_bytes = total_size_result.scalar() or 0
+                
+                # 総チャンク数（全テナント）
+                total_chunks_result = await self.db.execute(
+                    select(func.count())
+                    .select_from(File)
+                    .join(File.chunks)
+                    .where(File.deleted_at.is_(None))
+                )
+                total_chunks = total_chunks_result.scalar() or 0
+
+                # ステータス別件数（全テナント）
+                indexed_count_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.deleted_at.is_(None),
+                            File.status == FileStatus.INDEXED
+                        )
                     )
                 )
-            )
-            total_files = total_files_result.scalar() or 0
-            
-            # 総サイズ
-            total_size_result = await self.db.execute(
-                select(func.sum(File.size_bytes))
-                .where(
-                    and_(
-                        File.tenant_id == tenant_id,
-                        File.deleted_at.is_(None)
+                indexed_files = indexed_count_result.scalar() or 0
+
+                processing_count_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.deleted_at.is_(None),
+                            File.status == FileStatus.PROCESSING
+                        )
                     )
                 )
-            )
-            total_size_bytes = total_size_result.scalar() or 0
-            
-            # 総チャンク数
-            total_chunks_result = await self.db.execute(
-                select(func.count())
-                .select_from(File)
-                .join(File.chunks)
-                .where(
-                    and_(
-                        File.tenant_id == tenant_id,
-                        File.deleted_at.is_(None)
+                processing_files = processing_count_result.scalar() or 0
+
+                failed_count_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.deleted_at.is_(None),
+                            File.status == FileStatus.FAILED
+                        )
                     )
                 )
-            )
-            total_chunks = total_chunks_result.scalar() or 0
+                failed_files = failed_count_result.scalar() or 0
+            else:
+                # 総ファイル数
+                total_files_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.tenant_id == tenant_id,
+                            File.deleted_at.is_(None)
+                        )
+                    )
+                )
+                total_files = total_files_result.scalar() or 0
+                
+                # 総サイズ
+                total_size_result = await self.db.execute(
+                    select(func.sum(File.size_bytes))
+                    .where(
+                        and_(
+                            File.tenant_id == tenant_id,
+                            File.deleted_at.is_(None)
+                        )
+                    )
+                )
+                total_size_bytes = total_size_result.scalar() or 0
+                
+                # 総チャンク数
+                total_chunks_result = await self.db.execute(
+                    select(func.count())
+                    .select_from(File)
+                    .join(File.chunks)
+                    .where(
+                        and_(
+                            File.tenant_id == tenant_id,
+                            File.deleted_at.is_(None)
+                        )
+                    )
+                )
+                total_chunks = total_chunks_result.scalar() or 0
+
+                # ステータス別件数（テナント別）
+                indexed_count_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.tenant_id == tenant_id,
+                            File.deleted_at.is_(None),
+                            File.status == FileStatus.INDEXED
+                        )
+                    )
+                )
+                indexed_files = indexed_count_result.scalar() or 0
+
+                processing_count_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.tenant_id == tenant_id,
+                            File.deleted_at.is_(None),
+                            File.status == FileStatus.PROCESSING
+                        )
+                    )
+                )
+                processing_files = processing_count_result.scalar() or 0
+
+                failed_count_result = await self.db.execute(
+                    select(func.count(File.id))
+                    .where(
+                        and_(
+                            File.tenant_id == tenant_id,
+                            File.deleted_at.is_(None),
+                            File.status == FileStatus.FAILED
+                        )
+                    )
+                )
+                failed_files = failed_count_result.scalar() or 0
             
             # ストレージ制限（仮の値）
             storage_limit_mb = 100
             
             return StorageStats(
-                tenant_id=tenant_id,
+                tenant_id=tenant_id if tenant_id != "system" else "all",
                 total_files=total_files,
-                total_size_mb=total_size_bytes / (1024 * 1024),
+                total_size_mb=total_size_bytes / (1024 * 1024) if total_size_bytes else 0.0,
                 total_chunks=total_chunks,
                 storage_limit_mb=storage_limit_mb,
-                usage_percentage=(total_size_bytes / (1024 * 1024)) / storage_limit_mb * 100
+                usage_percentage=(total_size_bytes / (1024 * 1024)) / storage_limit_mb * 100 if total_size_bytes and storage_limit_mb > 0 else 0.0,
+                indexed_files=indexed_files if 'indexed_files' in locals() else 0,
+                processing_files=processing_files if 'processing_files' in locals() else 0,
+                failed_files=failed_files if 'failed_files' in locals() else 0
             )
             
         except Exception as e:
-            PerformanceLogger.log_api_performance(
-                "get_storage_stats",
-                0,
-                tenant_id=tenant_id
-            )
+            from app.utils.logging import logger
+            logger.error(f"ストレージ統計取得エラー: {str(e)}")
             raise
 
     async def get_dashboard_stats(
@@ -329,7 +468,7 @@ class StatsService:
         """ダッシュボード統計取得"""
         try:
             # 期間設定
-            end_date = datetime.utcnow()
+            end_date = DateTimeUtils.now()
             if period == "today":
                 start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
             elif period == "week":
@@ -339,39 +478,83 @@ class StatsService:
             else:
                 start_date = end_date - timedelta(days=30)
             
-            # 各統計を取得
-            usage_stats = await self.get_usage_stats(
-                tenant_id, start_date, end_date
+            # デフォルト値（失敗時のフォールバック）
+            usage_stats_default = UsageStats(
+                tenant_id=tenant_id if tenant_id != "system" else "all",
+                metric_type="queries",
+                granularity="day",
+                start_date=start_date,
+                end_date=end_date,
+                total_queries=0,
+                unique_users=0,
+                avg_response_time_ms=0.0,
+                feedback_rate=0.0,
+                like_rate=0.0,
             )
-            
-            llm_usage = await self.get_llm_usage_stats(
-                tenant_id, start_date, end_date
+            storage_stats_default = StorageStats(
+                tenant_id=tenant_id if tenant_id != "system" else "all",
+                total_files=0,
+                total_size_mb=0.0,
+                total_chunks=0,
+                storage_limit_mb=100,
+                usage_percentage=0.0,
             )
-            
-            storage_stats = await self.get_storage_stats(tenant_id)
-            
-            top_queries = await self.get_top_queries(
-                tenant_id, start_date, end_date, limit=5
-            )
+            llm_usage: List[LLMUsageStats] = []
+            top_queries: List[TopQuery] = []
+
+            # 各統計を取得（個別に例外処理して継続）
+            try:
+                usage_stats = await self.get_usage_stats(
+                    tenant_id, start_date, end_date
+                )
+            except Exception as e:  # noqa: BLE001
+                from app.utils.logging import logger
+                logger.error(f"ダッシュボード: usage_stats 取得エラー: {str(e)}")
+                usage_stats = usage_stats_default
+
+            try:
+                llm_usage = await self.get_llm_usage_stats(
+                    tenant_id, start_date, end_date
+                )
+            except Exception as e:  # noqa: BLE001
+                from app.utils.logging import logger
+                logger.error(f"ダッシュボード: llm_usage 取得エラー: {str(e)}")
+                llm_usage = []
+
+            try:
+                storage_stats = await self.get_storage_stats(tenant_id)
+            except Exception as e:  # noqa: BLE001
+                from app.utils.logging import logger
+                logger.error(f"ダッシュボード: storage_stats 取得エラー: {str(e)}")
+                storage_stats = storage_stats_default
+
+            try:
+                top_queries = await self.get_top_queries(
+                    tenant_id, start_date, end_date, limit=5
+                )
+            except Exception as e:  # noqa: BLE001
+                from app.utils.logging import logger
+                logger.error(f"ダッシュボード: top_queries 取得エラー: {str(e)}")
+                top_queries = []
             
             # 最近の活動（仮のデータ）
             recent_activity = [
                 {
                     "type": "conversation",
                     "description": "新しい質問が投稿されました",
-                    "timestamp": datetime.utcnow() - timedelta(minutes=5),
+                    "timestamp": DateTimeUtils.now() - timedelta(minutes=5),
                     "details": {"query": "返品方法について"}
                 },
                 {
                     "type": "file_upload",
                     "description": "ファイルがアップロードされました",
-                    "timestamp": datetime.utcnow() - timedelta(hours=1),
+                    "timestamp": DateTimeUtils.now() - timedelta(hours=1),
                     "details": {"filename": "FAQ.pdf"}
                 }
             ]
             
             return DashboardStats(
-                tenant_id=tenant_id,
+                tenant_id=tenant_id if tenant_id != "system" else "all",
                 period=period,
                 usage_stats=usage_stats,
                 llm_usage=llm_usage,
@@ -381,11 +564,9 @@ class StatsService:
             )
             
         except Exception as e:
-            PerformanceLogger.log_api_performance(
-                "get_dashboard_stats",
-                0,
-                tenant_id=tenant_id
-            )
+            # エラーログを出力（PerformanceLoggerは使用しない）
+            from app.utils.logging import logger
+            logger.error(f"ダッシュボード統計取得エラー: {str(e)}")
             raise
 
     async def _get_queries_count_for_date(
@@ -459,7 +640,7 @@ class MonitoringService:
                     threshold=80.0,
                     message=f"ストレージ使用量が{storage_stats.usage_percentage:.1f}%に達しました",
                     severity="medium",
-                    triggered_at=datetime.utcnow(),
+                    triggered_at=DateTimeUtils.now(),
                     is_resolved=False
                 ))
             
@@ -479,15 +660,15 @@ class MonitoringService:
             services = []
             
             # データベースヘルスチェック
-            db_start = datetime.utcnow()
+            db_start = DateTimeUtils.now()
             await self.db.execute(select(1))
-            db_duration = (datetime.utcnow() - db_start).total_seconds() * 1000
+            db_duration = (DateTimeUtils.now() - db_start).total_seconds() * 1000
             
             services.append(HealthCheck(
                 service="database",
                 status="healthy" if db_duration < 100 else "degraded",
                 response_time_ms=db_duration,
-                last_check=datetime.utcnow(),
+                last_check=DateTimeUtils.now(),
                 details={"connection": "active"}
             ))
             
@@ -502,7 +683,7 @@ class MonitoringService:
             return SystemHealth(
                 overall_status=overall_status,
                 services=services,
-                timestamp=datetime.utcnow()
+                timestamp=DateTimeUtils.now()
             )
             
         except Exception as e:

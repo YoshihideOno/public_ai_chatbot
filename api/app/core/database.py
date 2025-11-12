@@ -94,7 +94,7 @@ async def init_db():
     try:
         async with engine.begin() as conn:
             # Import all models here to ensure they are registered
-            from app.models import user, chat, tenant, file, chunk  # noqa
+            import app.models  # noqa: F401
             await conn.run_sync(Base.metadata.create_all)
             logging.info("データベーステーブルの初期化が完了しました")
     except Exception as e:

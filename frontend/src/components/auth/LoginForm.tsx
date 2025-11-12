@@ -121,7 +121,7 @@ export function LoginForm() {
             <span className="text-primary-foreground font-bold text-xl">RAG</span>
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            RAG AI Platform
+            RAG AI Chatbot Platform
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             アカウントにログインまたは新規登録してください

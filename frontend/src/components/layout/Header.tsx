@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { 
   Users, 
   Building2, 
@@ -60,6 +61,7 @@ export function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
    *   isMenuOpen: メニューの開閉状態
    */
   const { user, logout } = useAuth();
+  const { canViewUsers } = usePermissions();
   const pathname = usePathname();
 
   const handleLogout = async () => {
@@ -138,30 +140,34 @@ export function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">RAG</span>
             </div>
-            <span className="font-bold text-lg">AI Platform</span>
+            <span className="font-bold text-lg">AI Chatbot Platform</span>
           </Link>
         </div>
 
         {user && (
           <nav className="hidden md:flex items-center space-x-6">
-            <Link
-              href="/users"
-              className={cn(
-                "text-sm font-medium transition-colors hover:text-primary",
-                pathname.startsWith('/users') ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              ユーザー管理
-            </Link>
-            <Link
-              href="/tenants"
-              className={cn(
-                "text-sm font-medium transition-colors hover:text-primary",
-                pathname.startsWith('/tenants') ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              テナント管理
-            </Link>
+            {canViewUsers && (
+              <Link
+                href="/users"
+                className={cn(
+                  "text-sm font-medium transition-colors hover:text-primary",
+                  pathname.startsWith('/users') ? "text-primary" : "text-muted-foreground"
+                )}
+              >
+                ユーザー管理
+              </Link>
+            )}
+            {user?.role === 'PLATFORM_ADMIN' && (
+              <Link
+                href="/tenants"
+                className={cn(
+                  "text-sm font-medium transition-colors hover:text-primary",
+                  pathname.startsWith('/tenants') ? "text-primary" : "text-muted-foreground"
+                )}
+              >
+                テナント管理
+              </Link>
+            )}
             <Link
               href="/contents"
               className={cn(
@@ -246,23 +252,22 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { canViewUsers } = usePermissions();
 
   const navigation = [
     {
       name: 'ダッシュボード',
-      href: '/',
+      href: '/dashboard',
       icon: BarChart3,
     },
-    {
-      name: 'ユーザー管理',
-      href: '/users',
-      icon: Users,
-    },
-    {
-      name: 'テナント管理',
-      href: '/tenants',
-      icon: Building2,
-    },
+    // ユーザー管理は監査者も閲覧可（リンク表示）
+    ...((canViewUsers)
+      ? [{ name: 'ユーザー管理', href: '/users', icon: Users }]
+      : []),
+    // テナント管理はプラットフォーム管理者のみ表示
+    ...(user?.role === 'PLATFORM_ADMIN'
+      ? [{ name: 'テナント管理', href: '/tenants', icon: Building2 }]
+      : []),
     {
       name: 'コンテンツ管理',
       href: '/contents',
@@ -343,10 +348,10 @@ export function Footer() {
             <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-xs">RAG</span>
             </div>
-            <span className="text-sm font-medium">RAG AI Platform</span>
+            <span className="text-sm font-medium">AI Chatbot Platform</span>
           </div>
           <div className="text-sm text-muted-foreground">
-            © 2025 RAG AI Platform. All rights reserved.
+            © 2025 RAG AI Chatbot Platform. All rights reserved.
           </div>
         </div>
       </div>

@@ -112,7 +112,7 @@ class ApiKeyResponse(BaseModel):
     model: str
     is_active: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime]
     
     @classmethod
     def mask_api_key(cls, api_key: str) -> str:

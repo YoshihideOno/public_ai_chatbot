@@ -45,13 +45,44 @@ def create_app() -> FastAPI:
             raise
 
     # CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # 開発環境では広く許可し、運用環境では設定値に基づく厳格な許可を適用
+    if settings.DEBUG:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:3001",
+                "http://127.0.0.1:3001",
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
+                "null",  # file://プロトコル用
+            ],
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "Origin",
+                "X-Tenant-ID",  # Widget認証用
+                "X-API-Key",    # Widget認証用
+            ],
+            expose_headers=[
+                "Content-Length",
+                "Content-Type",
+                "X-Request-Id",
+            ],
+        )
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.BACKEND_CORS_ORIGINS,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     # Trusted host middleware
     if settings.BACKEND_CORS_ORIGINS:

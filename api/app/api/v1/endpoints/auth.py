@@ -13,7 +13,7 @@
 - OAuth2認証
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -148,6 +148,7 @@ async def register(
 @router.post("/verify-email")
 async def verify_email(
     token: str,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -158,6 +159,7 @@ async def verify_email(
     
     引数:
         token: 確認トークン
+        request: FastAPIのRequestオブジェクト
         db: データベースセッション
         
     戻り値:
@@ -180,11 +182,13 @@ async def verify_email(
         user.is_verified = True
         await db.commit()
         
+        # メール確認を監査ログに記録
         BusinessLogger.log_user_action(
             str(user.id),
             "verify_email",
-            "user",
-            tenant_id=str(user.tenant_id) if user.tenant_id else None
+            "auth",
+            tenant_id=str(user.tenant_id) if user.tenant_id else None,
+            request=request
         )
         
         logger.info(f"メール確認完了: {user.email}")
@@ -208,6 +212,7 @@ async def verify_email(
 @router.post("/login", response_model=Token)
 async def login(
     login_data: UserLogin,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Login user and return access token"""
@@ -216,6 +221,13 @@ async def login(
     # Authenticate user
     user = await user_service.authenticate(login_data.email, login_data.password)
     if not user:
+        # ログイン失敗を監査ログに記録
+        tenant_id = None
+        try:
+            # ユーザーが見つからない場合でも、メールアドレスからテナントを推測できないためスキップ
+            pass
+        except:
+            pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -223,6 +235,14 @@ async def login(
         )
     
     if not user.is_active:
+        # 非アクティブユーザーのログイン試行を監査ログに記録
+        BusinessLogger.log_user_action(
+            str(user.id),
+            "login_failed_inactive",
+            "auth",
+            tenant_id=str(user.tenant_id) if user.tenant_id else None,
+            request=request
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Inactive user",
@@ -242,6 +262,15 @@ async def login(
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
     
+    # ログイン成功を監査ログに記録
+    BusinessLogger.log_user_action(
+        str(user.id),
+        "login_success",
+        "auth",
+        tenant_id=str(user.tenant_id) if user.tenant_id else None,
+        request=request
+    )
+    
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -253,6 +282,7 @@ async def login(
 @router.post("/login/oauth", response_model=Token)
 async def login_oauth(
     form_data: OAuth2PasswordRequestForm = Depends(),
+    request: Request = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Login user with OAuth2 password flow"""
@@ -268,6 +298,14 @@ async def login_oauth(
         )
     
     if not user.is_active:
+        # 非アクティブユーザーのログイン試行を監査ログに記録
+        BusinessLogger.log_user_action(
+            str(user.id),
+            "login_failed_inactive",
+            "auth",
+            tenant_id=str(user.tenant_id) if user.tenant_id else None,
+            request=request
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Inactive user",
@@ -287,6 +325,15 @@ async def login_oauth(
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
     
+    # ログイン成功を監査ログに記録
+    BusinessLogger.log_user_action(
+        str(user.id),
+        "login_success_oauth",
+        "auth",
+        tenant_id=str(user.tenant_id) if user.tenant_id else None,
+        request=request
+    )
+    
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -298,6 +345,7 @@ async def login_oauth(
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
     refresh_token: str,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Refresh access token using refresh token"""
@@ -339,6 +387,15 @@ async def refresh_token(
         access_token = create_access_token(token_data)
         new_refresh_token = create_refresh_token(token_data)
         
+        # トークンリフレッシュを監査ログに記録
+        BusinessLogger.log_user_action(
+            str(user.id),
+            "token_refresh",
+            "auth",
+            tenant_id=str(user.tenant_id) if user.tenant_id else None,
+            request=request
+        )
+        
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
@@ -357,12 +414,23 @@ async def refresh_token(
 
 @router.post("/logout")
 async def logout(
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
     """Logout user (client should discard tokens)"""
     # In a stateless JWT system, logout is handled client-side
     # by discarding the tokens. Server-side logout would require
     # maintaining a blacklist of tokens, which is not implemented here.
+    
+    # ログアウトを監査ログに記録
+    BusinessLogger.log_user_action(
+        str(current_user.id),
+        "logout",
+        "auth",
+        tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None,
+        request=request
+    )
+    
     return {"message": "Successfully logged out"}
 
 
@@ -377,6 +445,7 @@ async def get_current_user_info(
 @router.post("/password-reset")
 async def request_password_reset(
     reset_data: PasswordReset,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Request password reset"""
@@ -393,6 +462,15 @@ async def request_password_reset(
         expires_delta=timedelta(hours=1)
     )
     
+    # パスワードリセット要求を監査ログに記録
+    BusinessLogger.log_user_action(
+        str(user.id),
+        "password_reset_request",
+        "auth",
+        tenant_id=str(user.tenant_id) if user.tenant_id else None,
+        request=request
+    )
+    
     # TODO: Send email with reset token
     # For now, just return success message
     
@@ -402,6 +480,7 @@ async def request_password_reset(
 @router.post("/password-reset/confirm")
 async def confirm_password_reset(
     reset_data: PasswordResetConfirm,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Confirm password reset"""
@@ -424,12 +503,23 @@ async def confirm_password_reset(
         
         # Update password
         user_service = UserService(db)
+        user = await user_service.get_by_id(int(user_id))
         success = await user_service.update_password(int(user_id), reset_data.new_password)
         
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to update password"
+            )
+        
+        # パスワードリセット実行を監査ログに記録
+        if user:
+            BusinessLogger.log_user_action(
+                str(user.id),
+                "password_reset_confirm",
+                "auth",
+                tenant_id=str(user.tenant_id) if user.tenant_id else None,
+                request=request
             )
         
         return {"message": "Password updated successfully"}

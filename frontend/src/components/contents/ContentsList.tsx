@@ -40,6 +40,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { apiClient, Content } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/utils/logger';
 import { 
   Plus, 
   Search, 
@@ -49,7 +50,6 @@ import {
   FileText,
   Filter,
   Download,
-  Upload,
   RefreshCw,
   Eye,
   File,
@@ -72,6 +72,7 @@ export function ContentsList(): React.ReactElement {
   
   // 検索・フィルタリングの状態管理
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
   const [fileTypeFilter, setFileTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   
@@ -82,6 +83,16 @@ export function ContentsList(): React.ReactElement {
 
   // 認証コンテキストから現在のユーザー情報を取得
   const { user: currentUser } = useAuth();
+
+  // 検索語のデバウンス処理
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(0); // 検索時にページをリセット
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   /**
    * コンテンツ一覧を取得する関数
@@ -102,7 +113,7 @@ export function ContentsList(): React.ReactElement {
         itemsPerPage, 
         fileTypeFilter || undefined, 
         statusFilter || undefined, 
-        searchTerm || undefined
+        debouncedSearchTerm || undefined
       );
       
       // 状態を更新
@@ -110,17 +121,76 @@ export function ContentsList(): React.ReactElement {
       setTotalPages(Math.ceil(contentsData.length / itemsPerPage));
     } catch (err: unknown) {
       // エラーログを出力
-      console.error('Failed to fetch contents:', err);
+      logger.error('コンテンツ一覧の取得に失敗', err);
       setError('コンテンツ一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  }, [fileTypeFilter, statusFilter, searchTerm]);
+  }, [fileTypeFilter, statusFilter, debouncedSearchTerm]);
 
   // コンテンツ一覧の取得を実行
   useEffect(() => {
     fetchContents(currentPage);
   }, [currentPage, fetchContents]);
+
+  // PROCESSING/UPLOADED が存在する間のみ短期ポーリングで自動更新
+  useEffect(() => {
+    const hasPending = contents.some(
+      (c) => c.status === 'PROCESSING' || c.status === 'UPLOADED'
+    );
+    if (!hasPending) return; 
+    const interval = setInterval(() => {
+      void fetchContents(currentPage);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [contents, currentPage, fetchContents]);
+
+  /**
+   * コンテンツをダウンロードする関数
+   * @param contentId 対象コンテンツのID
+   */
+  const handleDownloadContent = async (contentId: string, suggestedFileName?: string): Promise<void> => {
+    try {
+      const { blob, filename } = await apiClient.downloadContent(contentId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || suggestedFileName || 'content';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      logger.error('コンテンツのダウンロードに失敗', err);
+      setError('コンテンツのダウンロードに失敗しました');
+    }
+  };
+
+  /**
+   * コンテンツ一覧をエクスポートする関数
+   * @param format 'csv' | 'json'
+   */
+  const handleExport = async (format: 'csv' | 'json'): Promise<void> => {
+    try {
+      const { blob, filename } = await apiClient.exportContents({
+        fileType: fileTypeFilter || undefined,
+        status: statusFilter || undefined,
+        search: debouncedSearchTerm || undefined,
+        format,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `contents_export.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      logger.error('エクスポートに失敗', err);
+      setError('エクスポートに失敗しました');
+    }
+  };
 
   /**
    * コンテンツを削除する関数
@@ -141,7 +211,7 @@ export function ContentsList(): React.ReactElement {
       setContents(contents.filter(content => content.id !== contentId));
     } catch (err: unknown) {
       // エラーログを出力
-      console.error('Failed to delete content:', err);
+      logger.error('コンテンツの削除に失敗', err);
       setError('コンテンツの削除に失敗しました');
     }
   };
@@ -154,14 +224,14 @@ export function ContentsList(): React.ReactElement {
   const handleReindexContent = async (contentId: string): Promise<void> => {
     try {
       // TODO: 再インデックスAPIを実装
-      console.log('Reindexing content:', contentId);
+      logger.info('コンテンツの再インデックス開始', { contentId });
       alert('再インデックスが開始されました');
       
       // 一覧を再取得
       await fetchContents(currentPage);
     } catch (err: unknown) {
       // エラーログを出力
-      console.error('Failed to reindex content:', err);
+      logger.error('再インデックスの開始に失敗', err);
       setError('再インデックスの開始に失敗しました');
     }
   };
@@ -253,15 +323,6 @@ export function ContentsList(): React.ReactElement {
                            currentUser?.role === 'TENANT_ADMIN' || 
                            currentUser?.role === 'OPERATOR';
 
-  // ローディング状態の表示
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -273,12 +334,6 @@ export function ContentsList(): React.ReactElement {
         </div>
         {canManageContents && (
           <div className="flex items-center space-x-2">
-            <Button variant="outline" asChild>
-              <Link href="/contents/upload">
-                <Upload className="mr-2 h-4 w-4" />
-                ファイルアップロード
-              </Link>
-            </Button>
             <Button asChild>
               <Link href="/contents/new">
                 <Plus className="mr-2 h-4 w-4" />
@@ -336,16 +391,39 @@ export function ContentsList(): React.ReactElement {
               <option value="UPLOADED">アップロード済み</option>
               <option value="FAILED">失敗</option>
             </select>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setFileTypeFilter('');
+                setStatusFilter('');
+                setCurrentPage(0);
+              }}
+            >
               <Filter className="mr-2 h-4 w-4" />
-              フィルタ
+              リセット
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              エクスポート
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  エクスポート
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>形式を選択</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => void handleExport('csv')}>CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleExport('json')}>JSON</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          )}
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -392,7 +470,7 @@ export function ContentsList(): React.ReactElement {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {formatFileSize(content.size_bytes)}
+                          {formatFileSize(content.file_size ?? content.size_bytes ?? 0)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -437,6 +515,10 @@ export function ContentsList(): React.ReactElement {
                                     <Edit className="mr-2 h-4 w-4" />
                                     編集
                                   </Link>
+                                </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void handleDownloadContent(content.id, content.file_name)}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  ダウンロード
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleReindexContent(content.id)}>
                                   <RefreshCw className="mr-2 h-4 w-4" />

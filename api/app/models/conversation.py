@@ -13,8 +13,6 @@ class Conversation(Base):
     user_input = Column(Text, nullable=False)
     bot_output = Column(Text, nullable=False)
     referenced_chunks = Column(JSONB, nullable=False, server_default='[]')
-    tokens_in = Column(Integer, nullable=False, default=0)
-    tokens_out = Column(Integer, nullable=False, default=0)
     model = Column(String(100), nullable=False)
     latency_ms = Column(Integer, nullable=True)
     feedback = Column(String(50), nullable=True)

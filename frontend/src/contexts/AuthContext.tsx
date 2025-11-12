@@ -16,6 +16,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, LoginRequest, apiClient } from '@/lib/api';
+import { logger } from '@/utils/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // ログイン成功後、ダッシュボードにリダイレクト
       window.location.href = '/dashboard';
     } catch (error) {
-      console.error('Login failed:', error);
+      logger.error('ログイン失敗', error);
       throw error;
     }
   };
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await apiClient.logout();
     } catch (error) {
-      console.error('Logout failed:', error);
+      logger.error('ログアウト失敗', error);
     } finally {
       setUser(null);
       // トークンを削除
@@ -105,9 +106,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const userData = await apiClient.getCurrentUser();
       setUser(userData);
-    } catch (error) {
-      console.error('Failed to refresh user:', error);
-      setUser(null);
+    } catch (error: any) {
+      // 401エラー（認証失敗）やNetwork Errorは想定内の動作
+      // トークンが無効な場合やサーバーが応答しない場合は静かに失敗
+      if (error.response?.status === 401 || error.code === 'ERR_NETWORK') {
+        // 認証エラーまたはネットワークエラーの場合は静かに処理
+        setUser(null);
+        // トークンを削除（無効なトークンは保持しない）
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      } else {
+        // その他の予期しないエラーの場合のみログ出力
+        logger.error('ユーザー情報の更新に失敗', error);
+        setUser(null);
+      }
     }
   };
 
@@ -116,13 +128,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const initAuth = async () => {
       const token = localStorage.getItem('access_token');
       if (token) {
-        try {
-          await refreshUser();
-        } catch (error) {
-          console.error('Failed to initialize auth:', error);
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-        }
+        // refreshUserは内部でエラーハンドリングされているため、
+        // ここではcatch不要（エラーは既に処理されている）
+        await refreshUser();
       }
       setIsLoading(false);
     };

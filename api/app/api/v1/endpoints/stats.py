@@ -32,12 +32,22 @@ async def get_usage_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """利用統計取得"""
-    tenant_id = get_tenant_from_user(current_user)
     stats_service = StatsService(db)
+    
+    # プラットフォーム管理者の場合、tenant_idはNoneになる
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"  # Platform admin can access all tenants
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     
     # デフォルト期間設定
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = DateTimeUtils.now()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
@@ -49,7 +59,7 @@ async def get_usage_stats(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_usage_stats",
         "usage_stats",
         tenant_id=tenant_id
@@ -67,12 +77,20 @@ async def get_usage_time_series(
     db: AsyncSession = Depends(get_db)
 ):
     """利用統計時系列データ取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     stats_service = StatsService(db)
     
     # デフォルト期間設定
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = DateTimeUtils.now()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
@@ -84,7 +102,7 @@ async def get_usage_time_series(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_usage_time_series",
         "usage_time_series",
         tenant_id=tenant_id
@@ -102,12 +120,20 @@ async def get_top_queries(
     db: AsyncSession = Depends(get_db)
 ):
     """よくある質問TOP取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     stats_service = StatsService(db)
     
     # デフォルト期間設定
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = DateTimeUtils.now()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
@@ -119,7 +145,7 @@ async def get_top_queries(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_top_queries",
         "top_queries",
         tenant_id=tenant_id
@@ -136,12 +162,20 @@ async def get_llm_usage_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """LLM使用量統計取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     stats_service = StatsService(db)
     
     # デフォルト期間設定
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = DateTimeUtils.now()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
@@ -152,7 +186,7 @@ async def get_llm_usage_stats(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_llm_usage_stats",
         "llm_usage_stats",
         tenant_id=tenant_id
@@ -169,12 +203,20 @@ async def get_feedback_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """評価統計取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     stats_service = StatsService(db)
     
     # デフォルト期間設定
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = DateTimeUtils.now()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
@@ -185,7 +227,7 @@ async def get_feedback_stats(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_feedback_stats",
         "feedback_stats",
         tenant_id=tenant_id
@@ -200,13 +242,21 @@ async def get_storage_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """ストレージ統計取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     stats_service = StatsService(db)
     
     storage_stats = await stats_service.get_storage_stats(tenant_id)
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_storage_stats",
         "storage_stats",
         tenant_id=tenant_id
@@ -222,8 +272,19 @@ async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """ダッシュボード統計取得"""
-    tenant_id = get_tenant_from_user(current_user)
     stats_service = StatsService(db)
+    
+    # プラットフォーム管理者の場合、tenant_idはNoneになる
+    # その場合はデフォルトのテナントIDとして"system"を使用
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"  # Platform admin can access all tenants
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     
     dashboard_stats = await stats_service.get_dashboard_stats(
         tenant_id=tenant_id,
@@ -231,10 +292,10 @@ async def get_dashboard_stats(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_dashboard_stats",
         "dashboard_stats",
-        tenant_id=tenant_id
+        tenant_id=tenant_id if tenant_id != "system" else None
     )
     
     return dashboard_stats
@@ -249,12 +310,20 @@ async def export_stats_csv(
     db: AsyncSession = Depends(get_db)
 ):
     """統計データCSVエクスポート"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     stats_service = StatsService(db)
     
     # デフォルト期間設定
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = DateTimeUtils.now()
     if not start_date:
         start_date = end_date - timedelta(days=30)
     
@@ -262,11 +331,11 @@ async def export_stats_csv(
     csv_data = f"""期間,{start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}
 メトリクス,{metric_type}
 テナントID,{tenant_id}
-エクスポート日時,{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+エクスポート日時,{DateTimeUtils.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "export_stats_csv",
         "stats_export",
         tenant_id=tenant_id
@@ -287,7 +356,15 @@ async def create_alert_rule(
     db: AsyncSession = Depends(get_db)
 ):
     """アラートルール作成"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     monitoring_service = MonitoringService(db)
     
     alert_rule = await monitoring_service.create_alert_rule(
@@ -296,7 +373,7 @@ async def create_alert_rule(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "create_alert_rule",
         "alert_rule",
         tenant_id=tenant_id
@@ -311,13 +388,21 @@ async def get_alerts(
     db: AsyncSession = Depends(get_db)
 ):
     """アラート一覧取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     monitoring_service = MonitoringService(db)
     
     alerts = await monitoring_service.check_alerts(tenant_id)
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_alerts",
         "alerts",
         tenant_id=tenant_id
@@ -337,7 +422,7 @@ async def get_system_health(
     health = await monitoring_service.get_system_health()
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_system_health",
         "system_health",
         tenant_id=None
@@ -355,7 +440,15 @@ async def log_metric(
     db: AsyncSession = Depends(get_db)
 ):
     """メトリクスログ記録"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     monitoring_service = MonitoringService(db)
     
     await monitoring_service.log_metric(
@@ -366,7 +459,7 @@ async def log_metric(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "log_metric",
         "metric_log",
         tenant_id=tenant_id
@@ -381,7 +474,15 @@ async def get_monitoring_config(
     db: AsyncSession = Depends(get_db)
 ):
     """監視設定取得"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     
     # TODO: 実際の監視設定をDBから取得
     config = MonitoringConfig(
@@ -394,7 +495,7 @@ async def get_monitoring_config(
     )
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "get_monitoring_config",
         "monitoring_config",
         tenant_id=tenant_id
@@ -410,13 +511,21 @@ async def update_monitoring_config(
     db: AsyncSession = Depends(get_db)
 ):
     """監視設定更新"""
-    tenant_id = get_tenant_from_user(current_user)
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "system"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="テナントIDが設定されていません"
+            )
     
     # TODO: 実際の監視設定をDBに保存
     config_data.tenant_id = tenant_id
     
     BusinessLogger.log_user_action(
-        current_user.id,
+        str(current_user.id),
         "update_monitoring_config",
         "monitoring_config",
         tenant_id=tenant_id

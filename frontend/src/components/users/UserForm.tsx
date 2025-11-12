@@ -26,8 +26,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -36,14 +34,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { apiClient, User, ApiError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   ArrowLeft, 
   Save, 
-  User as UserIcon,
-  Shield,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -61,7 +56,7 @@ const userSchema = z.object({
 type UserFormData = z.infer<typeof userSchema>;
 
 interface UserFormProps {
-  userId?: number;
+  userId?: string | number;
   mode: 'create' | 'edit' | 'view';
 }
 
@@ -81,11 +76,15 @@ export function UserForm({ userId, mode }: UserFormProps) {
     register,
     handleSubmit,
     setValue,
+    reset,
     watch,
+    setError: setFormError,
     formState: { errors, isSubmitting },
   } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
     defaultValues: {
+      email: '',
+      username: '',
       role: 'OPERATOR',
       is_active: true,
     },
@@ -102,18 +101,21 @@ export function UserForm({ userId, mode }: UserFormProps) {
       const userData = await apiClient.getUser(userId);
       setUser(userData);
       
-      // フォームに値を設定
-      setValue('email', userData.email);
-      setValue('username', userData.username);
-      setValue('role', userData.role);
-      setValue('is_active', userData.is_active);
+      // フォームに値を設定（resetメソッドを使用して確実に初期値を設定）
+      reset({
+        email: userData.email,
+        username: userData.username,
+        role: userData.role,
+        is_active: userData.is_active,
+        password: undefined, // 編集時はパスワードは未設定
+      });
     } catch (err: unknown) {
       console.error('Failed to fetch user:', err);
       setError('ユーザー情報の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  }, [userId, setValue]);
+  }, [userId, reset]);
 
   useEffect(() => {
     if (userId && !isCreateMode) {
@@ -129,7 +131,21 @@ export function UserForm({ userId, mode }: UserFormProps) {
       if (isCreateMode) {
         await apiClient.createUser(data);
       } else if (userId) {
-        await apiClient.updateUser(userId, data);
+        // 自分自身かつ管理者以外は /users/me に送る（ロールは送らない）
+        const isAdmin = currentUser?.role === 'PLATFORM_ADMIN' || currentUser?.role === 'TENANT_ADMIN';
+        const payload: Partial<User> = { ...data } as unknown as Partial<User>;
+        if (!canChangeRole) {
+          // 型安全にroleを取り除く
+          const tmp = payload as Partial<User> & { role?: User['role'] };
+          if ('role' in tmp) {
+            delete (tmp as { role?: unknown }).role;
+          }
+        }
+        if (!isAdmin && isSelf) {
+          await apiClient.updateCurrentUser(payload);
+        } else {
+          await apiClient.updateUser(userId, payload);
+        }
       }
       
       router.push('/users');
@@ -137,11 +153,14 @@ export function UserForm({ userId, mode }: UserFormProps) {
       console.error('Failed to save user:', err);
       
       if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { response?: { data?: ApiError } };
-        if (axiosError.response?.data?.error?.message) {
-          setError(axiosError.response.data.error.message);
+        const axiosError = err as { response?: { status?: number; data?: any } };
+        const message: string | undefined = axiosError.response?.data?.detail || axiosError.response?.data?.error?.message;
+        // 重複メールの明示エラー
+        if (axiosError.response?.status === 400 && message && message.toLowerCase().includes('email')) {
+          setFormError('email', { type: 'manual', message: 'このメールアドレスは既に登録されています' });
+          setError('入力内容を確認してください');
         } else {
-          setError('ユーザーの保存に失敗しました');
+          setError(message || 'ユーザーの保存に失敗しました');
         }
       } else if (err instanceof Error) {
         setError(err.message);
@@ -153,38 +172,13 @@ export function UserForm({ userId, mode }: UserFormProps) {
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case 'PLATFORM_ADMIN':
-        return 'destructive';
-      case 'TENANT_ADMIN':
-        return 'default';
-      case 'OPERATOR':
-        return 'secondary';
-      case 'AUDITOR':
-        return 'outline';
-      default:
-        return 'outline';
-    }
-  };
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'PLATFORM_ADMIN':
-        return 'プラットフォーム管理者';
-      case 'TENANT_ADMIN':
-        return 'テナント管理者';
-      case 'OPERATOR':
-        return '運用者';
-      case 'AUDITOR':
-        return '監査者';
-      default:
-        return role;
-    }
-  };
-
-  const canEdit = currentUser?.role === 'PLATFORM_ADMIN' || 
-                  (currentUser?.role === 'TENANT_ADMIN' && user?.role !== 'PLATFORM_ADMIN');
+  const isSelf = user && currentUser && String(user.id) === String(currentUser.id);
+  const canEdit = (currentUser?.role === 'PLATFORM_ADMIN') || 
+                  (currentUser?.role === 'TENANT_ADMIN' && user?.role !== 'PLATFORM_ADMIN') ||
+                  Boolean(isSelf);
+  // ロール変更可否: プラットフォーム管理者は可。テナント管理者は対象が管理者でない場合に限り可。
+  const canChangeRole = (currentUser?.role === 'PLATFORM_ADMIN') ||
+    (currentUser?.role === 'TENANT_ADMIN' && (user?.role !== 'PLATFORM_ADMIN' && user?.role !== 'TENANT_ADMIN'));
 
   if (isLoading) {
     return (
@@ -219,18 +213,20 @@ export function UserForm({ userId, mode }: UserFormProps) {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* メイン情報 */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>基本情報</CardTitle>
-              <CardDescription>
-                ユーザーの基本情報を設定します
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>基本情報</CardTitle>
+            <CardDescription>
+              ユーザーの基本情報を設定します
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" autoComplete="off">
+                {/* ブラウザの自動入力抑止用ダミーフィールド */}
+                <input type="text" name="prevent_autofill_username" autoComplete="username" style={{ display: 'none' }} tabIndex={-1} />
+                <input type="password" name="prevent_autofill_password" autoComplete="new-password" style={{ display: 'none' }} tabIndex={-1} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="username">ユーザー名</Label>
@@ -238,7 +234,12 @@ export function UserForm({ userId, mode }: UserFormProps) {
                       id="username"
                       {...register('username')}
                       disabled={isViewMode || !canEdit}
+                      autoComplete="off"
+                      placeholder="例: yamada_taro"
                     />
+                    {!errors.username && (
+                      <p className="text-xs text-muted-foreground">英数字とアンダースコアのみ。3〜100文字推奨</p>
+                    )}
                     {errors.username && (
                       <p className="text-sm text-red-600">{errors.username.message}</p>
                     )}
@@ -251,12 +252,16 @@ export function UserForm({ userId, mode }: UserFormProps) {
                       type="email"
                       {...register('email')}
                       disabled={isViewMode || !canEdit}
+                      autoComplete="off"
+                      placeholder="例: user@example.com"
                     />
                     {errors.email && (
                       <p className="text-sm text-red-600">{errors.email.message}</p>
                     )}
                   </div>
                 </div>
+
+                {/* ロール説明はロールセレクトの直下に表示へ移設 */}
 
                 {isCreateMode && (
                   <div className="space-y-2">
@@ -267,6 +272,8 @@ export function UserForm({ userId, mode }: UserFormProps) {
                         type={showPassword ? 'text' : 'password'}
                         {...register('password')}
                         disabled={isViewMode || !canEdit}
+                        autoComplete="new-password"
+                        placeholder="8文字以上（大文字・小文字・数字を含む推奨）"
                       />
                       <Button
                         type="button"
@@ -283,8 +290,10 @@ export function UserForm({ userId, mode }: UserFormProps) {
                         )}
                       </Button>
                     </div>
-                    {errors.password && (
+                    {errors.password ? (
                       <p className="text-sm text-red-600">{errors.password.message}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">例: Abcdef12</p>
                     )}
                   </div>
                 )}
@@ -295,22 +304,44 @@ export function UserForm({ userId, mode }: UserFormProps) {
                     <Select
                       value={watchedRole}
                       onValueChange={(value) => setValue('role', value as UserFormData['role'])}
-                      disabled={isViewMode || !canEdit}
+                      disabled={isViewMode || !canChangeRole}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="ロールを選択" />
                       </SelectTrigger>
                       <SelectContent>
+                        {/* 常に基本ロールは表示 */}
                         <SelectItem value="OPERATOR">運用者</SelectItem>
                         <SelectItem value="AUDITOR">監査者</SelectItem>
+
+                        {/* プラットフォーム管理者は上位ロールも編集可 */}
                         {currentUser?.role === 'PLATFORM_ADMIN' && (
                           <>
                             <SelectItem value="TENANT_ADMIN">テナント管理者</SelectItem>
                             <SelectItem value="PLATFORM_ADMIN">プラットフォーム管理者</SelectItem>
                           </>
                         )}
+
+                        {/* 編集不可のケースでも、現在のロールがリストに無い場合は表示（disabled） */}
+                        {currentUser?.role !== 'PLATFORM_ADMIN' && watchedRole === 'TENANT_ADMIN' && (
+                          <SelectItem value="TENANT_ADMIN" disabled>
+                            テナント管理者
+                          </SelectItem>
+                        )}
+                        {currentUser?.role !== 'PLATFORM_ADMIN' && watchedRole === 'PLATFORM_ADMIN' && (
+                          <SelectItem value="PLATFORM_ADMIN" disabled>
+                            プラットフォーム管理者
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
+                    {/* ロール説明（ロールセレクト直下） */}
+                    <div className="text-xs text-muted-foreground">
+                      {watchedRole === 'PLATFORM_ADMIN' && '全システムの管理権限を持ちます'}
+                      {watchedRole === 'TENANT_ADMIN' && '自テナントの管理権限を持ちます'}
+                      {watchedRole === 'OPERATOR' && 'コンテンツ管理と統計確認ができます'}
+                      {watchedRole === 'AUDITOR' && 'ログ閲覧と監査データエクスポートができます'}
+                    </div>
                     {errors.role && (
                       <p className="text-sm text-red-600">{errors.role.message}</p>
                     )}
@@ -332,6 +363,28 @@ export function UserForm({ userId, mode }: UserFormProps) {
                   </div>
                 </div>
 
+                {/* 作成日・最終ログイン（基本情報内に移動） */}
+                {user && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                    <div className="space-y-1">
+                      <Label className="text-sm text-muted-foreground">作成日</Label>
+                      <div className="text-sm">
+                        {format(new Date(user.created_at), 'yyyy/MM/dd', { locale: ja })}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-muted-foreground">最終ログイン</Label>
+                      <div className="text-sm">
+                        {user.last_login_at ? (
+                          format(new Date(user.last_login_at), 'yyyy/MM/dd HH:mm', { locale: ja })
+                        ) : (
+                          <span className="text-muted-foreground">未ログイン</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {!isViewMode && canEdit && (
                   <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={() => router.back()}>
@@ -343,123 +396,9 @@ export function UserForm({ userId, mode }: UserFormProps) {
                     </Button>
                   </div>
                 )}
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* サイドバー情報 */}
-        <div className="space-y-6">
-          {/* ユーザー情報 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <UserIcon className="mr-2 h-5 w-5" />
-                ユーザー情報
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src="" alt={user?.username || ''} />
-                  <AvatarFallback>
-                    <UserIcon className="h-6 w-6" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{user?.username || '新規ユーザー'}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {user?.email || 'メールアドレス未設定'}
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">ロール</span>
-                  <Badge variant={getRoleBadgeVariant(watchedRole)}>
-                    {getRoleLabel(watchedRole)}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">ステータス</span>
-                  <Badge variant={watchedIsActive ? 'default' : 'secondary'}>
-                    {watchedIsActive ? 'アクティブ' : '非アクティブ'}
-                  </Badge>
-                </div>
-
-                {user && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">作成日</span>
-                      <span className="text-sm">
-                        {format(new Date(user.created_at), 'yyyy/MM/dd', { locale: ja })}
-                      </span>
-                    </div>
-
-                    {user.last_login_at && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">最終ログイン</span>
-                        <span className="text-sm">
-                          {format(new Date(user.last_login_at), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 権限情報 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="mr-2 h-5 w-5" />
-                権限情報
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {watchedRole === 'PLATFORM_ADMIN' && (
-                  <div className="text-sm">
-                    <div className="font-medium">プラットフォーム管理者</div>
-                    <div className="text-muted-foreground">
-                      全システムの管理権限を持ちます
-                    </div>
-                  </div>
-                )}
-                {watchedRole === 'TENANT_ADMIN' && (
-                  <div className="text-sm">
-                    <div className="font-medium">テナント管理者</div>
-                    <div className="text-muted-foreground">
-                      自テナントの管理権限を持ちます
-                    </div>
-                  </div>
-                )}
-                {watchedRole === 'OPERATOR' && (
-                  <div className="text-sm">
-                    <div className="font-medium">運用者</div>
-                    <div className="text-muted-foreground">
-                      コンテンツ管理と統計確認ができます
-                    </div>
-                  </div>
-                )}
-                {watchedRole === 'AUDITOR' && (
-                  <div className="text-sm">
-                    <div className="font-medium">監査者</div>
-                    <div className="text-muted-foreground">
-                      ログ閲覧と監査データエクスポートができます
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

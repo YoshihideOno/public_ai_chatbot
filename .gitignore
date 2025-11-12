@@ -31,6 +31,11 @@ tmp/
 temp/
 node_modules
 
+# Storage/uploads
+uploads/
+storage/uploads/
+/app/uploads/
+
 # Python
 __pycache__/
 *.py[cod]

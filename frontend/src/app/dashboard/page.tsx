@@ -1,25 +1,31 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { AdminRequestForm } from '@/components/auth/AdminRequestForm';
 import { 
   Users, 
   Building2, 
-  FileText, 
   BarChart3,
   TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle,
   Activity,
-  Database
+  Database,
+  Settings,
+  XCircle,
+  Download,
+  Copy
 } from 'lucide-react';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -40,6 +46,7 @@ function DashboardContent() {
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalTenants: 0,
+    activeTenants: 0,
     totalContents: 0,
     totalQueries: 0,
     activeUsers: 0,
@@ -49,12 +56,97 @@ function DashboardContent() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [systemConfigStatus, setSystemConfigStatus] = useState<{
+    hasChatModel: boolean;
+    hasEmbeddingModel: boolean;
+    hasApiKey: boolean;
+    chatModelName: string | null;
+    embeddingModelName: string | null;
+    apiKeyCount: number;
+    hasIndexedContent: boolean;
+    indexedCount: number;
+    isReady: boolean;
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    hasChatModel: false,
+    hasEmbeddingModel: false,
+    hasApiKey: false,
+    chatModelName: null,
+    embeddingModelName: null,
+    apiKeyCount: 0,
+    hasIndexedContent: false,
+    indexedCount: 0,
+    isReady: false,
+    isLoading: false,
+    error: null,
+  });
 
   const { user } = useAuth();
+  const [activities, setActivities] = useState<{
+    id: string;
+    action: string;
+    entity_type?: string;
+    message?: string;
+    created_at: string;
+  }[]>([]);
+  const [tenant, setTenant] = useState<{ id: string; api_key: string } | null>(null);
 
-  useEffect(() => {
-    fetchDashboardStats();
+  // APIベースURLを計算（クライアントサイド）
+  const apiBaseUrl = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      // 環境変数から取得（ビルド時に注入される）
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+      }
+      // 開発環境ではローカルのAPIサーバーを参照
+      if (window.location.origin === 'http://localhost:3000') {
+        return 'http://localhost:8000/api/v1';
+      }
+    }
+    // 本番環境では相対パスを使用
+    return '/api/v1';
   }, []);
+
+  /**
+   * 埋め込みコード情報を取得
+   * 
+   * テナントに所属する全ユーザーが埋め込みコードを参照できるようにするため、
+   * 埋め込みスニペット情報を取得します。
+   */
+  const fetchTenantForEmbed = useCallback(async () => {
+    if (!user?.tenant_id) {
+      console.log('fetchTenantForEmbed: user.tenant_id is not set');
+      return;
+    }
+
+    try {
+      console.log('Fetching embed snippet for tenant:', user.tenant_id);
+      const embedData = await apiClient.getEmbedSnippet(user.tenant_id);
+      console.log('Embed snippet data received:', embedData);
+      if (embedData) {
+        setTenant({
+          id: embedData.tenant_id,
+          api_key: embedData.api_key || ''
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch embed snippet:', err);
+      if (err && typeof err === 'object') {
+        if ('response' in err) {
+          const axiosError = err as { response?: { status?: number; data?: any }; request?: any; message?: string };
+          console.error('Error status:', axiosError.response?.status);
+          console.error('Error data:', axiosError.response?.data);
+          console.error('Error message:', axiosError.message);
+        } else if ('message' in err) {
+          const error = err as { message?: string; code?: string };
+          console.error('Network error:', error.message);
+          console.error('Error code:', error.code);
+        }
+      }
+      // エラーが発生してもダッシュボード表示は続行
+    }
+  }, [user?.tenant_id]);
 
   const fetchDashboardStats = async () => {
     try {
@@ -64,23 +156,149 @@ function DashboardContent() {
       // ダッシュボード統計を取得
       const dashboardStats = await apiClient.getDashboardStats('month');
       
+      // プラットフォーム管理者の場合、テナント状況の実データを取得
+      let totalTenants = 0;
+      let activeTenants = 0;
+      let totalUsers = 0;
+      
+      if (user?.role === 'PLATFORM_ADMIN') {
+        try {
+          // テナント一覧を取得（最大1000件）
+          const tenants = await apiClient.getTenants(0, 1000);
+          totalTenants = tenants.length;
+          activeTenants = tenants.filter(t => t.status === 'ACTIVE').length;
+          
+          // ユーザー一覧を取得（最大1000件、削除済みは除外される）
+          const users = await apiClient.getUsers(0, 1000);
+          totalUsers = users.length;
+        } catch (err) {
+          console.error('Failed to fetch tenant/user stats:', err);
+          // エラーが発生してもダッシュボード表示は続行
+        }
+      }
+      
       setStats({
-        totalUsers: dashboardStats.usage_stats?.total_queries || 0,
-        totalTenants: dashboardStats.usage_stats?.unique_users || 0,
+        totalUsers: totalUsers || (dashboardStats.usage_stats?.total_queries || 0),
+        totalTenants: totalTenants || (dashboardStats.usage_stats?.unique_users || 0),
+        activeTenants: activeTenants,
         totalContents: dashboardStats.storage_stats?.total_files || 0,
         totalQueries: dashboardStats.usage_stats?.total_queries || 0,
         activeUsers: dashboardStats.usage_stats?.unique_users || 0,
-        indexedContents: dashboardStats.storage_stats?.total_files || 0,
-        processingContents: 0,
-        failedContents: 0,
+        indexedContents: (dashboardStats.storage_stats as any)?.indexed_files ?? dashboardStats.storage_stats?.total_files ?? 0,
+        processingContents: (dashboardStats.storage_stats as any)?.processing_files ?? 0,
+        failedContents: (dashboardStats.storage_stats as any)?.failed_files ?? 0,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch dashboard stats:', err);
       setError('統計データの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
   };
+
+  /**
+   * システム設定状況を取得
+   * 
+   * チャット用モデル、ベクトル埋め込みモデル、APIキーの設定状況を確認し、
+   * システムが使用可能かどうかを判定します。
+   */
+  const fetchSystemConfigStatus = useCallback(async () => {
+    if (!user?.tenant_id) {
+      setSystemConfigStatus({
+        hasChatModel: false,
+        hasEmbeddingModel: false,
+        hasApiKey: false,
+        chatModelName: null,
+        embeddingModelName: null,
+        apiKeyCount: 0,
+        hasIndexedContent: false,
+        indexedCount: 0,
+        isReady: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    try {
+      setSystemConfigStatus(prev => ({ ...prev, isLoading: true, error: null }));
+
+      // テナント情報 / APIキー / コンテンツ統計を並行取得
+      const [tenant, apiKeys, contentStats] = await Promise.all([
+        apiClient.getTenant(user.tenant_id),
+        apiClient.getApiKeys().catch(() => ({ api_keys: [], total_count: 0 })),
+        apiClient.getContentStatsSummary().catch(() => ({ total_files: 0, status_counts: {}, total_chunks: 0, total_size_mb: 0, file_types: {} })),
+      ]);
+
+      const hasChatModel = !!tenant?.settings?.default_model;
+      const hasEmbeddingModel = !!tenant?.settings?.embedding_model;
+      const chatModel = tenant?.settings?.default_model || null;
+      const embeddingModel = tenant?.settings?.embedding_model || null;
+      
+      // 有効なAPIキー（is_active = true）のみをカウント
+      const activeApiKeys = apiKeys.api_keys?.filter(apiKey => apiKey.is_active) || [];
+      const apiKeyCount = activeApiKeys.length;
+      
+      // APIキーの必要数の判定
+      // チャット用モデルとベクトル埋め込みモデルが同一の場合は1つ、異なる場合は2つ必要
+      const requiredApiKeyCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
+      const hasApiKey = apiKeyCount >= requiredApiKeyCount;
+      
+      const statusCounts = (contentStats.status_counts || {}) as Record<string, number>;
+      const indexedCount = typeof statusCounts['INDEXED'] === 'number' ? statusCounts['INDEXED'] : 0;
+      const hasIndexedContent = indexedCount >= 1;
+      const isReady = hasChatModel && hasEmbeddingModel && hasApiKey;
+
+      setSystemConfigStatus({
+        hasChatModel,
+        hasEmbeddingModel,
+        hasApiKey,
+        chatModelName: tenant?.settings?.default_model || null,
+        embeddingModelName: tenant?.settings?.embedding_model || null,
+        apiKeyCount,
+        hasIndexedContent,
+        indexedCount,
+        isReady,
+        isLoading: false,
+        error: null,
+      });
+    } catch (err: unknown) {
+      console.error('Failed to fetch system config status:', err);
+      setSystemConfigStatus(prev => ({
+        ...prev,
+        isLoading: false,
+        error: '設定状況の取得に失敗しました',
+      }));
+    }
+  }, [user?.tenant_id]);
+
+  useEffect(() => {
+    fetchDashboardStats();
+    fetchSystemConfigStatus();
+    fetchTenantForEmbed();
+  }, [fetchSystemConfigStatus, fetchTenantForEmbed]);
+
+  // 最近の活動取得
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let isCancelled = false;
+    const fetchActivities = async () => {
+      try {
+        const items = await apiClient.getRecentActivities(10);
+        if (!isCancelled) setActivities(items);
+      } catch {
+        // サイレント
+      }
+    };
+    // 初回
+    fetchActivities();
+    // 軽いポーリング（10秒）
+    timer = setInterval(fetchActivities, 10000);
+    return () => {
+      isCancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, []);
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
@@ -227,10 +445,143 @@ function DashboardContent() {
                 </Badge>
               </div>
             </div>
-            <AdminRequestForm />
           </div>
         </CardContent>
       </Card>
+
+      {/* システム設定状況 */}
+      {user?.tenant_id && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Settings className="mr-2 h-5 w-5" />
+              システム設定状況
+            </CardTitle>
+            <CardDescription>
+              システムを使用するために必要な設定の確認
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {systemConfigStatus.isLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            ) : systemConfigStatus.error ? (
+              <div className="text-sm text-muted-foreground">{systemConfigStatus.error}</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  {/* コンテンツ（インデックス済み） */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {systemConfigStatus.hasIndexedContent ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      )}
+                      <span className="text-sm font-medium">コンテンツ</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      インデックス済み {systemConfigStatus.indexedCount}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {systemConfigStatus.hasChatModel ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      )}
+                      <span className="text-sm font-medium">チャット用モデル</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {systemConfigStatus.hasChatModel
+                        ? systemConfigStatus.chatModelName || '設定済み'
+                        : '未設定'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {systemConfigStatus.hasEmbeddingModel ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      )}
+                      <span className="text-sm font-medium">ベクトル埋め込みモデル</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {systemConfigStatus.hasEmbeddingModel
+                        ? systemConfigStatus.embeddingModelName || '設定済み'
+                        : '未設定'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {systemConfigStatus.hasApiKey ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      )}
+                      <span className="text-sm font-medium">APIキー</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {systemConfigStatus.hasApiKey
+                        ? `${systemConfigStatus.apiKeyCount}件有効`
+                        : (() => {
+                            const chatModel = systemConfigStatus.chatModelName;
+                            const embeddingModel = systemConfigStatus.embeddingModelName;
+                            const requiredCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
+                            return `不足（${requiredCount}件必要、現在有効${systemConfigStatus.apiKeyCount}件）`;
+                          })()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {systemConfigStatus.isReady ? (
+                        <>
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <span className="text-sm font-medium text-green-600">チャットボット利用可能</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-5 w-5 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-600">設定が必要</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {!systemConfigStatus.isReady && (
+                    <div className="mt-3">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        システムを使用するには、チャット用モデル、ベクトル埋め込みモデルの選択とAPIキーの登録が必要です。
+                        {systemConfigStatus.chatModelName && systemConfigStatus.embeddingModelName && (
+                          <span className="block mt-1">
+                            {systemConfigStatus.chatModelName === systemConfigStatus.embeddingModelName
+                              ? 'モデルが同一のため、APIキーは1件必要です。'
+                              : 'モデルが異なるため、APIキーは2件必要です。'}
+                          </span>
+                        )}
+                      </p>
+                      <Link href="/settings">
+                        <Button variant="default" size="sm">
+                          <Settings className="mr-2 h-4 w-4" />
+                          テナント設定を開く
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 統計カード - 管理者のみ表示 */}
       {shouldShowStats() && (
@@ -348,7 +699,7 @@ function DashboardContent() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">アクティブテナント</span>
-              <Badge variant="default">{stats.totalTenants}</Badge>
+              <Badge variant="default">{stats.activeTenants}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">総ユーザー数</span>
@@ -364,80 +715,127 @@ function DashboardContent() {
         <CardHeader>
           <CardTitle>最近の活動</CardTitle>
           <CardDescription>
-            {user?.role === 'AUDITOR' 
-              ? 'システムの監査ログとアクティビティ' 
-              : 'システム内での最近の活動履歴'
-            }
+            システム内での最近の活動履歴
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {user?.role === 'AUDITOR' ? (
-              // 監査者向けの活動履歴
-              <>
-                <div className="flex items-center space-x-4">
-                  <div className="h-2 w-2 bg-red-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">セキュリティイベントが検出されました</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="h-2 w-2 bg-yellow-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">権限変更ログが記録されました</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(Date.now() - 3600000), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">データアクセスログが更新されました</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(Date.now() - 7200000), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                    </p>
-                  </div>
-                </div>
-              </>
+            {activities.length === 0 ? (
+              <div className="text-sm text-muted-foreground">最近の活動はありません</div>
             ) : (
-              // 一般ユーザー向けの活動履歴
-              <>
-                <div className="flex items-center space-x-4">
-                  <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">新しいコンテンツがアップロードされました</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
+              activities.map((a) => (
+                <div key={a.id} className="flex items-center space-x-4">
                   <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">テナント「Acme Corp」が作成されました</p>
+                    <p className={`text-sm font-medium ${
+                      (a.action?.includes('content_') || a.message?.includes('インデックス'))
+                        ? 'text-red-600'
+                        : ''
+                    }`}>
+                      {a.action}{a.entity_type ? `（${a.entity_type}）` : ''}
+                    </p>
+                    {a.message && (
+                      <p className={`text-xs line-clamp-2 ${
+                        (a.action?.includes('content_failed') || a.message?.includes('失敗'))
+                          ? 'text-red-600 font-semibold'
+                          : 'text-muted-foreground'
+                      }`}>
+                        {a.message}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
-                      {format(new Date(Date.now() - 3600000), 'yyyy/MM/dd HH:mm', { locale: ja })}
+                      {a.created_at ? format(new Date(a.created_at), 'yyyy/MM/dd HH:mm', { locale: ja }) : '-'}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <div className="h-2 w-2 bg-yellow-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">APIキーが再発行されました</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(Date.now() - 7200000), 'yyyy/MM/dd HH:mm', { locale: ja })}
-                    </p>
-                  </div>
-                </div>
-              </>
+              ))
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* 埋め込みコード */}
+      {user?.tenant_id && tenant && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Download className="mr-2 h-5 w-5" />
+              埋め込みコード
+            </CardTitle>
+            <CardDescription>
+              ウェブサイトにチャットウィジェットを埋め込むためのコード
+              <span className="mt-1 block text-sm text-red-600">
+                完全なAPIキーを含むコードをコピーするには必ず「コピー」ボタンをご利用ください。テキストエリアから直接コピーするとAPIキーが欠落します。
+              </span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>埋め込みスニペット</Label>
+              <Textarea
+                value={`<!-- チャットウィジェット埋め込みコード -->
+<script>
+  (function(w,d,s,o,f,js,fjs){
+    w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
+    js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
+    js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
+  }(window,document,'script','ragChat','https://cdn.rag-chatbot.com/widget.js'));
+  
+  ragChat('init', {
+    tenantId: '${tenant.id}',
+    apiKey: '${tenant.api_key ? `${tenant.api_key.slice(0, 20)}...` : 'YOUR_API_KEY'}',
+    apiBaseUrl: '${apiBaseUrl}',
+    theme: 'light',
+    position: 'bottom-right'
+  });
+</script>`}
+                readOnly
+                className="font-mono text-sm min-h-[200px]"
+              />
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    // 完全な埋め込みコード（APIキーを含む）
+                    const embedCode = `<!-- チャットウィジェット埋め込みコード -->
+<script>
+  (function(w,d,s,o,f,js,fjs){
+    w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
+    js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
+    js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
+  }(window,document,'script','ragChat','https://cdn.rag-chatbot.com/widget.js'));
+  
+  ragChat('init', {
+    tenantId: '${tenant.id}',
+    apiKey: '${tenant.api_key || 'YOUR_API_KEY'}',
+    apiBaseUrl: '${apiBaseUrl}',
+    theme: 'light',
+    position: 'bottom-right'
+  });
+</script>`;
+                    try {
+                      await navigator.clipboard.writeText(embedCode);
+                      alert('クリップボードにコピーしました');
+                    } catch (err) {
+                      console.error('Failed to copy to clipboard:', err);
+                    }
+                  }}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  コピー
+                </Button>
+              </div>
+            </div>
+
+            <Alert>
+              <AlertDescription>
+                このコードをウェブサイトのHTMLに貼り付けると、チャットウィジェットが表示されます。
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

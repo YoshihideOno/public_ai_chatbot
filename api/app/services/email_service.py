@@ -315,4 +315,205 @@ class EmailService:
             logger.error(f"リマインダーメール送信失敗: {str(e)}")
             return False
 
+    @staticmethod
+    async def send_content_processing_success_email(
+        to_email: str,
+        username: str,
+        file_title: str,
+        file_name: str,
+        chunk_count: int
+    ) -> bool:
+        """
+        コンテンツ処理成功メール送信
+        
+        引数:
+            to_email: 送信先メールアドレス
+            username: ユーザー名
+            file_title: ファイルタイトル
+            file_name: ファイル名
+            chunk_count: チャンク数
+        戻り値:
+            bool: 送信成功可否
+        """
+        subject = "コンテンツ処理が完了しました"
+        html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #28a745; margin-bottom: 20px;">✓ コンテンツ処理が完了しました</h2>
+                <p>こんにちは、{username}さん</p>
+                <p>以下のファイルの処理が正常に完了しました：</p>
+                
+                <div style="background-color: white; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>ファイル名:</strong> {file_title}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>ファイル:</strong> {file_name}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>チャンク数:</strong> {chunk_count}</p>
+                </div>
+                
+                <p>このファイルは検索可能になりました。チャットボットで質問できます。</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{settings.APP_URL or 'http://localhost:3000'}/contents" 
+                       style="background-color: #007bff; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 4px; display: inline-block;">
+                        コンテンツ一覧を確認
+                    </a>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">
+                    AI Chatbot Platform<br>
+                    このメールは自動送信されています。
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # 開発環境ではメール送信をスキップし、ログに情報を出力
+        if settings.ENVIRONMENT == "development":
+            logger.info(f"【開発環境】コンテンツ処理成功メール送信（スキップ）")
+            logger.info(f"送信先: {to_email}")
+            logger.info(f"ユーザー名: {username}")
+            logger.info(f"ファイル名: {file_title}")
+            logger.info(f"ファイル: {file_name}")
+            logger.info(f"チャンク数: {chunk_count}")
+            return True
+        
+        # 本番環境ではResend APIを使用
+        if not settings.RESEND_API_KEY or resend is None:
+            logger.warning("Resend未設定のためメール送信をスキップ")
+            return False
+        
+        try:
+            params = {
+                "from": settings.EMAIL_FROM_ADDRESS,
+                "to": [to_email],
+                "subject": subject,
+                "html": html,
+            }
+            
+            # 非同期でメール送信を実行（タイムアウト設定付き）
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: resend.Emails.send(params)  # type: ignore
+                ),
+                timeout=30.0  # 30秒のタイムアウト
+            )
+            
+            if response and hasattr(response, 'id'):
+                BusinessLogger.info(f"コンテンツ処理成功メール送信完了: {response.id}")
+                return True
+            else:
+                logger.error("コンテンツ処理成功メール送信レスポンスが無効です")
+                return False
+                
+        except Exception as e:
+            logger.error(f"コンテンツ処理成功メール送信失敗: {str(e)}")
+            return False
+
+    @staticmethod
+    async def send_content_processing_failure_email(
+        to_email: str,
+        username: str,
+        file_title: str,
+        file_name: str,
+        error_message: str
+    ) -> bool:
+        """
+        コンテンツ処理失敗メール送信
+        
+        引数:
+            to_email: 送信先メールアドレス
+            username: ユーザー名
+            file_title: ファイルタイトル
+            file_name: ファイル名
+            error_message: エラーメッセージ
+        戻り値:
+            bool: 送信成功可否
+        """
+        subject = "コンテンツ処理に失敗しました"
+        html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #dc3545; margin-bottom: 20px;">⚠ コンテンツ処理に失敗しました</h2>
+                <p>こんにちは、{username}さん</p>
+                <p>以下のファイルの処理中にエラーが発生しました：</p>
+                
+                <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>ファイル名:</strong> {file_title}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>ファイル:</strong> {file_name}</p>
+                    <p style="margin: 10px 0 0 0;"><strong>エラー内容:</strong></p>
+                    <p style="margin: 5px 0 0 0; color: #721c24;">{error_message}</p>
+                </div>
+                
+                <p>ファイルを再アップロードするか、サポートにお問い合わせください。</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{settings.APP_URL or 'http://localhost:3000'}/contents" 
+                       style="background-color: #dc3545; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 4px; display: inline-block;">
+                        コンテンツ一覧を確認
+                    </a>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">
+                    AI Chatbot Platform<br>
+                    このメールは自動送信されています。
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # 開発環境ではメール送信をスキップし、ログに情報を出力
+        if settings.ENVIRONMENT == "development":
+            logger.info(f"【開発環境】コンテンツ処理失敗メール送信（スキップ）")
+            logger.info(f"送信先: {to_email}")
+            logger.info(f"ユーザー名: {username}")
+            logger.info(f"ファイル名: {file_title}")
+            logger.info(f"ファイル: {file_name}")
+            logger.info(f"エラー内容: {error_message}")
+            return True
+        
+        # 本番環境ではResend APIを使用
+        if not settings.RESEND_API_KEY or resend is None:
+            logger.warning("Resend未設定のためメール送信をスキップ")
+            return False
+        
+        try:
+            params = {
+                "from": settings.EMAIL_FROM_ADDRESS,
+                "to": [to_email],
+                "subject": subject,
+                "html": html,
+            }
+            
+            # 非同期でメール送信を実行（タイムアウト設定付き）
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: resend.Emails.send(params)  # type: ignore
+                ),
+                timeout=30.0  # 30秒のタイムアウト
+            )
+            
+            if response and hasattr(response, 'id'):
+                BusinessLogger.info(f"コンテンツ処理失敗メール送信完了: {response.id}")
+                return True
+            else:
+                logger.error("コンテンツ処理失敗メール送信レスポンスが無効です")
+                return False
+                
+        except Exception as e:
+            logger.error(f"コンテンツ処理失敗メール送信失敗: {str(e)}")
+            return False
+
 

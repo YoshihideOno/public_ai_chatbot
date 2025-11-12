@@ -20,24 +20,20 @@ services:
       - db
       - fastapi
 
-  # AIチャットボットフロントエンド
-  frontend-chatbot:
+  # ウィジェット配信サーバー
+  widget-cdn:
     build:
-      context: ./ai_chatbot_app
+      context: ./packages/widget
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "3001:3001"
     volumes:
-      - ./ai_chatbot_app:/app
-    env_file:
-      - ./.env.local
+      - ./packages/widget:/app
     environment:
       - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3001
       - TZ=Asia/Tokyo
-    command: sh -c "npm install && npm run dev"
-    depends_on:
-      - db
-      - fastapi
+    command: sh -c "npm install && npm run build && npm run serve"
 
   fastapi:
     build:
@@ -51,7 +47,7 @@ services:
       - ./api/.env
       - ./.env.local
     environment:
-      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ai_chatbot_db?options=-c%20timezone%3DAsia%2FTokyo
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ai_chatbot_db
       - TZ=Asia/Tokyo
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
