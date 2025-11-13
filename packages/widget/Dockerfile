@@ -1,6 +1,9 @@
 # ベースイメージとしてNode.jsのLTSバージョンを使用
 FROM node:20-alpine
 
+# bashとその他の開発用ツールをインストール（デバッグ用）
+RUN apk add --no-cache bash curl
+
 # 作業ディレクトリを設定
 WORKDIR /app
 

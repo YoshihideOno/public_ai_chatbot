@@ -20,6 +20,7 @@ interface ChatWidgetProps {
   apiKey?: string;
   theme?: 'light' | 'dark';
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  initialMessage?: string;
 }
 
 /**
@@ -29,12 +30,14 @@ interface ChatWidgetProps {
  * @param apiKey - APIキー（環境変数から取得する場合は省略可能）
  * @param theme - テーマ（light/dark）
  * @param position - 初期位置
+ * @param initialMessage - 初期メッセージ（省略時はデフォルトメッセージを表示）
  */
 export function ChatWidget({
   tenantId,
   apiKey,
   theme = 'light',
   position = 'bottom-right',
+  initialMessage,
 }: ChatWidgetProps) {
   // 環境変数からテナントIDとAPIキーを取得
   const widgetTenantId = tenantId || process.env.NEXT_PUBLIC_WIDGET_TENANT_ID;
@@ -79,12 +82,13 @@ export function ChatWidget({
           apiBaseUrl: apiBaseUrl,
           theme,
           position,
+          initialMessage,
         });
       } else {
         console.warn('チャットウィジェット: テナントIDまたはAPIキーが設定されていません');
       }
     }
-  }, [widgetTenantId, widgetApiKey, apiBaseUrl, theme, position]);
+  }, [widgetTenantId, widgetApiKey, apiBaseUrl, theme, position, initialMessage]);
 
   // テナントIDとAPIキーが設定されていない場合は何も表示しない
   if (!widgetTenantId || !widgetApiKey) {
@@ -109,6 +113,7 @@ export function ChatWidget({
               apiBaseUrl: apiBaseUrl,
               theme,
               position,
+              initialMessage,
             });
           }
         }}

@@ -786,7 +786,8 @@ function DashboardContent() {
     apiKey: '${tenant.api_key ? `${tenant.api_key.slice(0, 20)}...` : 'YOUR_API_KEY'}',
     apiBaseUrl: '${apiBaseUrl}',
     theme: 'light',
-    position: 'bottom-right'
+    position: 'bottom-right',
+    initialMessage: 'こんにちは！何かお手伝いできることはありますか？' // オプション: 初期メッセージ
   });
 </script>`}
                 readOnly
@@ -811,7 +812,8 @@ function DashboardContent() {
     apiKey: '${tenant.api_key || 'YOUR_API_KEY'}',
     apiBaseUrl: '${apiBaseUrl}',
     theme: 'light',
-    position: 'bottom-right'
+    position: 'bottom-right',
+    initialMessage: 'こんにちは！何かお手伝いできることはありますか？' // オプション: 初期メッセージ
   });
 </script>`;
                     try {

@@ -1001,7 +1001,8 @@ export default function LandingPage() {
     tenantId: 'YOUR_TENANT_ID',
     apiKey: 'YOUR_API_KEY',
     theme: 'light',
-    position: 'bottom-right'
+    position: 'bottom-right',
+    initialMessage: 'こんにちは！何かお手伝いできることはありますか？' // オプション: 初期メッセージ
   });
 </script>`}
                   language="html"
@@ -1038,6 +1039,7 @@ export default function Layout({ children }) {
           apiKey={process.env.NEXT_PUBLIC_WIDGET_API_KEY}
           theme="light"
           position="bottom-right"
+          initialMessage="こんにちは！何かお手伝いできることはありますか？"
         />
       </body>
     </html>
@@ -1059,6 +1061,7 @@ function App() {
         apiKey="YOUR_API_KEY"
         theme="light"
         position="bottom-right"
+        initialMessage="こんにちは！何かお手伝いできることはありますか？"
       />
     </div>
   );
@@ -1100,7 +1103,8 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
   tenantId: 'YOUR_TENANT_ID',
   apiKey: 'YOUR_API_KEY',
   theme: 'light',  // 'light' または 'dark'
-  position: 'bottom-right'
+  position: 'bottom-right',
+  initialMessage: 'こんにちは！何かお手伝いできることはありますか？' // オプション
 });`}
                         language="javascript"
                       />
@@ -1116,7 +1120,8 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
   tenantId: 'YOUR_TENANT_ID',
   apiKey: 'YOUR_API_KEY',
   theme: 'light',
-  position: 'bottom-right'  // 'bottom-right', 'bottom-left', 'top-right', 'top-left'
+  position: 'bottom-right',  // 'bottom-right', 'bottom-left', 'top-right', 'top-left'
+  initialMessage: 'こんにちは！何かお手伝いできることはありますか？' // オプション
 });`}
                         language="javascript"
                       />
@@ -1387,7 +1392,7 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
                   24時間以内に回答いたします
                 </CardDescription>
                 <p className="text-sm text-primary font-medium mt-2">
-                  support@rag-ai-platform.com
+                  support@synergysoft.jp
                 </p>
               </CardContent>
             </Card>
@@ -1397,14 +1402,14 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
                 <div className="mx-auto w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                   <Phone className="h-6 w-6 text-green-600" />
                 </div>
-                <CardTitle>電話サポート</CardTitle>
+                <CardTitle>Google Meet サポート</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>
-                  平日 9:00-18:00
+                  平日 10:00-17:00
                 </CardDescription>
                 <p className="text-sm text-primary font-medium mt-2">
-                  03-1234-5678
+                  こちらより申込下さい
                 </p>
               </CardContent>
             </Card>
@@ -1414,14 +1419,14 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
                 <div className="mx-auto w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
                   <MessageCircle className="h-6 w-6 text-purple-600" />
                 </div>
-                <CardTitle>チャットサポート</CardTitle>
+                <CardTitle>AIチャットボットサポート</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>
                   リアルタイムでサポート
                 </CardDescription>
                 <p className="text-sm text-primary font-medium mt-2">
-                  ログイン後利用可能
+                  右下のゴールデンレトリバーをクリックしてください
                 </p>
               </CardContent>
             </Card>
@@ -1430,25 +1435,25 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
           <div className="mt-12 text-center">
             <Card className="max-w-2xl mx-auto">
               <CardHeader>
-                <CardTitle>会社情報</CardTitle>
+                <CardTitle>拠点情報</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center space-x-2">
                   <MapPin className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">
-                    〒100-0001 東京都千代田区千代田1-1-1
+                    〒036-8141 弘前市松原東2-2-6
                   </span>
                 </div>
                 <div className="flex items-center justify-center space-x-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">
-                    営業時間: 平日 9:00-18:00
+                    営業時間: 平日 10:00-17:00
                   </span>
                 </div>
                 <div className="flex items-center justify-center space-x-2">
                   <Globe className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">
-                    https://rag-ai-platform.com
+                    https://synergysoft.jp
                   </span>
                 </div>
               </CardContent>
@@ -1498,8 +1503,6 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>機能一覧</li>
                 <li>価格</li>
-                <li>API</li>
-                <li>統合</li>
               </ul>
             </div>
             <div>
@@ -1508,13 +1511,12 @@ REACT_APP_WIDGET_URL=https://cdn.rag-chatbot.com/widget.js`,
                 <li>ヘルプセンター</li>
                 <li>ドキュメント</li>
                 <li>コミュニティ</li>
-                <li>ステータス</li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">会社</h3>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li>会社概要</li>
+                <li>私達について</li>
                 <li>採用情報</li>
                 <li>プレス</li>
                 <li>パートナー</li>

@@ -4,12 +4,12 @@
   "private": true,
   "description": "AI Chatbot application built with Next.js and PostgreSQL",
   "scripts": {
-    "dev": "cd ai_chatbot_app && npm run dev",
-    "build": "cd ai_chatbot_app && npm run build",
-    "start": "cd ai_chatbot_app && npm run start"
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm run start"
   },
   "workspaces": [
-    "ai_chatbot_app"
+    "frontend"
   ],
   "engines": {
     "node": ">=20.0.0",

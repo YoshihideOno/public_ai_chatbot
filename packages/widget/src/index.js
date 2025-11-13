@@ -201,6 +201,9 @@
       this.sessionId = null; // セッションID
       this.isLoading = false; // ローディング状態
       
+      // デフォルトメッセージの定義
+      this.DEFAULT_INITIAL_MESSAGE = 'こんにちは！何かお手伝いできることはありますか？';
+      
       // 保存された状態を復元
       this.restoreState();
       
@@ -270,6 +273,24 @@
     }
 
     /**
+     * ウィジェットのベースURLを取得（画像などのアセット用）
+     * @returns {string} ウィジェットのベースURL
+     */
+    getWidgetBaseUrl() {
+      // 現在実行されているスクリプトタグからURLを取得
+      const scripts = d.getElementsByTagName('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const src = scripts[i].src;
+        if (src && src.includes('widget.js')) {
+          // widget.jsのディレクトリを取得
+          return src.substring(0, src.lastIndexOf('/'));
+        }
+      }
+      // フォールバック: デフォルトのCDN URL
+      return this.config.widgetBaseUrl || 'http://localhost:3001';
+    }
+
+    /**
      * 保存された状態を復元
      */
     restoreState() {
@@ -335,8 +356,8 @@
         this.host.style.right = '20px';
         this.host.style.bottom = '20px';
         // 初期位置を計算
-        this.currentX = w.innerWidth - 68; // 48px + 20px margin
-        this.currentY = w.innerHeight - 68;
+        this.currentX = w.innerWidth - 100; // 80px + 20px margin
+        this.currentY = w.innerHeight - 100;
       }
 
       // DOMに追加
@@ -384,8 +405,8 @@
         }
         
         .toggle {
-          width: 56px;
-          height: 56px;
+          width: 80px;
+          height: 80px;
           border-radius: 50%;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: #fff;
@@ -394,13 +415,22 @@
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 24px;
+          font-size: 0;
+          padding: 0;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4), 0 2px 8px rgba(0, 0, 0, 0.1);
           user-select: none;
           -webkit-user-select: none;
           position: relative;
           overflow: hidden;
+        }
+
+        .toggle img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+          pointer-events: none;
         }
         
         .toggle::before {
@@ -521,6 +551,32 @@
         
         .chat-close:active {
           transform: rotate(90deg) scale(0.95);
+        }
+        
+        .chat-clear {
+          background: rgba(255, 255, 255, 0.15);
+          border: none;
+          color: #fff;
+          font-size: 18px;
+          cursor: pointer;
+          padding: 0;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          transition: all 0.2s ease;
+          margin-right: 8px;
+        }
+        
+        .chat-clear:hover {
+          background: rgba(255, 255, 255, 0.25);
+          transform: scale(1.1);
+        }
+        
+        .chat-clear:active {
+          transform: scale(1.05);
         }
         
         .chat-messages {
@@ -732,8 +788,19 @@
       btn.className = 'toggle';
       btn.setAttribute('aria-label', 'AIチャットボットを開く');
       btn.setAttribute('title', 'AIチャットボットを開く');
-      btn.textContent = '💬';
       btn.setAttribute('draggable', 'false');
+      
+      // マスコット画像を追加
+      const mascotImg = d.createElement('img');
+      const widgetBaseUrl = this.getWidgetBaseUrl();
+      mascotImg.src = `${widgetBaseUrl}/assets/mascot/ciel.png`;
+      mascotImg.alt = 'AIチャットボット';
+      mascotImg.onerror = function() {
+        // 画像の読み込みに失敗した場合は絵文字を表示
+        btn.textContent = '💬';
+        mascotImg.style.display = 'none';
+      };
+      btn.appendChild(mascotImg);
 
       // チャットダイアログ
       const dialog = d.createElement('div');
@@ -747,12 +814,27 @@
       header.className = 'chat-header';
       const title = d.createElement('h3');
       title.innerHTML = '<span>AIチャットボット</span>';
+      
+      // クリアボタン
+      const clearBtn = d.createElement('button');
+      clearBtn.className = 'chat-clear';
+      clearBtn.setAttribute('aria-label', '会話履歴をクリア');
+      clearBtn.setAttribute('title', '会話履歴をクリア');
+      clearBtn.innerHTML = '🗑️';
+      clearBtn.addEventListener('click', () => {
+        if (confirm('会話履歴をクリアしますか？')) {
+          this.clearMessages();
+        }
+      });
+      
       const closeBtn = d.createElement('button');
       closeBtn.className = 'chat-close';
       closeBtn.setAttribute('aria-label', 'チャットを閉じる');
       closeBtn.innerHTML = '×';
       closeBtn.addEventListener('click', () => this.closeDialog());
+      
       header.appendChild(title);
+      header.appendChild(clearBtn);
       header.appendChild(closeBtn);
 
       // メッセージエリア
@@ -861,8 +943,8 @@
             let newY = initialY + deltaY;
 
             // 境界チェック
-            const widgetWidth = 48;
-            const widgetHeight = 48;
+            const widgetWidth = 80;
+            const widgetHeight = 80;
             const maxX = w.innerWidth - widgetWidth;
             const maxY = w.innerHeight - widgetHeight;
 
@@ -934,6 +1016,59 @@
     }
 
     /**
+     * 初期メッセージを表示するかどうかをチェック
+     * @returns {boolean} 表示すべきかどうか
+     */
+    shouldShowInitialMessage() {
+      const FLAG_KEY = 'rag-chat-widget-initial-message-shown';
+      try {
+        if (w.sessionStorage) {
+          return !w.sessionStorage.getItem(FLAG_KEY);
+        }
+      } catch (error) {
+        console.warn('初期メッセージフラグのチェックに失敗しました:', error);
+      }
+      return true;
+    }
+
+    /**
+     * 初期メッセージ表示フラグを設定
+     */
+    setInitialMessageShown() {
+      const FLAG_KEY = 'rag-chat-widget-initial-message-shown';
+      try {
+        if (w.sessionStorage) {
+          w.sessionStorage.setItem(FLAG_KEY, 'true');
+        }
+      } catch (error) {
+        console.warn('初期メッセージフラグの保存に失敗しました:', error);
+      }
+    }
+
+    /**
+     * 初期メッセージ表示フラグをリセット
+     */
+    resetInitialMessageFlag() {
+      const FLAG_KEY = 'rag-chat-widget-initial-message-shown';
+      try {
+        if (w.sessionStorage) {
+          w.sessionStorage.removeItem(FLAG_KEY);
+        }
+      } catch (error) {
+        console.warn('初期メッセージフラグのリセットに失敗しました:', error);
+      }
+    }
+
+    /**
+     * 初期メッセージを表示
+     */
+    showInitialMessage() {
+      const initialMessage = this.config.initialMessage || this.DEFAULT_INITIAL_MESSAGE;
+      this.addMessage(initialMessage, 'bot');
+      this.setInitialMessageShown();
+    }
+
+    /**
      * ダイアログを開閉
      */
     toggleDialog() {
@@ -941,6 +1076,11 @@
       if (this.isOpen) {
         this.dialog.classList.add('open');
         this.input.focus();
+        
+        // 初回表示の場合、初期メッセージを表示
+        if (this.shouldShowInitialMessage()) {
+          this.showInitialMessage();
+        }
       } else {
         this.dialog.classList.remove('open');
       }
@@ -1264,6 +1404,35 @@
       
       this.messagesArea.appendChild(message);
       this.messagesArea.scrollTop = this.messagesArea.scrollHeight;
+      
+      // 状態を保存
+      this.saveState();
+    }
+
+    /**
+     * 会話履歴をクリア
+     */
+    clearMessages() {
+      // メッセージ配列をクリア
+      this.messages = [];
+      
+      // DOMからすべてのメッセージを削除
+      if (this.messagesArea) {
+        this.messagesArea.innerHTML = '';
+      }
+      
+      // sessionStorageからも会話履歴を削除
+      const saved = StateManager.load();
+      if (saved) {
+        saved.messages = [];
+        StateManager.save(saved);
+      }
+      
+      // 初回表示フラグをリセット
+      this.resetInitialMessageFlag();
+      
+      // 初期メッセージを再表示
+      this.showInitialMessage();
       
       // 状態を保存
       this.saveState();
