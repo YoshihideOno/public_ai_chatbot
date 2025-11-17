@@ -31,6 +31,12 @@ export interface TenantSettings {
   max_users?: number;
   max_contents?: number;
   max_storage_mb?: number;
+  max_queries_per_day?: number;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  enable_api_access?: boolean;
+  enable_webhook?: boolean;
+  webhook_url?: string;
   // 追加: LLMモデル既定
   default_model?: string | null; // 回答用モデル（nullは未選択を意味する）
   embedding_model?: string | null; // 埋め込み用モデル（nullは未選択を意味する）
@@ -267,7 +273,8 @@ export class ApiClient {
       }
     }
     
-    this.baseURL = browserBase;
+    const resolvedBaseURL = browserBase ?? 'http://localhost:8000';
+    this.baseURL = resolvedBaseURL;
     
     this.client = axios.create({
       baseURL: `${this.baseURL}/api/v1`,
@@ -626,6 +633,10 @@ export class ApiClient {
     return res.data;
   }
 
+  async deleteApiKey(apiKeyId: string): Promise<void> {
+    await this.client.delete(`/api-keys/${apiKeyId}`);
+  }
+
   async verifyApiKey(apiKeyId: string): Promise<{ valid: boolean; provider: string; model: string; message?: string; error_code?: string }> {
     const res = await this.client.post(`/api-keys/${apiKeyId}/verify`);
     return res.data;
@@ -640,6 +651,20 @@ export class ApiClient {
   async updateTenantSettings(tenantId: string, settings: Partial<TenantSettings>): Promise<{ message: string } | Tenant> {
     const res = await this.client.put(`/tenants/${tenantId}/settings`, settings);
     return res.data;
+  }
+
+  async exportTenants(format: 'csv' | 'json' = 'csv'): Promise<{ blob: Blob; filename: string }> {
+    const res = await this.client.get<Blob>('/tenants/export', {
+      params: { format },
+      responseType: 'blob',
+    });
+    const disposition = res.headers['content-disposition'];
+    const match = disposition?.match(/filename="?([^";]+)"?/i);
+    const filename = match?.[1] ?? `tenants_export.${format}`;
+    return {
+      blob: res.data,
+      filename,
+    };
   }
 
   async getRecentActivities(limit: number = 10): Promise<RecentActivity[]> {

@@ -61,8 +61,10 @@ class Logger {
       message,
       service: this.serviceName,
       environment: this.environment,
-      ...(data && { data }),
     };
+    if (typeof data !== 'undefined') {
+      entry.data = data;
+    }
     return JSON.stringify(entry);
   }
 
@@ -77,12 +79,18 @@ class Logger {
    */
   private serializeError(error: unknown): unknown {
     if (error instanceof Error) {
-      return {
+      const serialized: Record<string, unknown> = {
         name: error.name,
         message: error.message,
         stack: error.stack,
-        ...(error instanceof Error && 'cause' in error && { cause: error.cause }),
       };
+      if ('cause' in error) {
+        const causeInfo = (error as Error & { cause?: unknown }).cause;
+        if (typeof causeInfo !== 'undefined') {
+          serialized.cause = causeInfo;
+        }
+      }
+      return serialized;
     }
     return error;
   }

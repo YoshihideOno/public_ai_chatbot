@@ -9,15 +9,18 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { PermissionService } from '@/lib/permissions';
+import type { User } from '@/lib/api';
+
+type UserRole = User['role'];
 
 export function usePermissions() {
   const { user } = useAuth();
-  const role = user?.role;
+  const role = user?.role as UserRole | undefined;
 
   return {
     canViewUsers: PermissionService.canViewUsers(role),
     canManageUsers: PermissionService.canManageUsers(role),
-    canDeleteUser: (targetRole: string | undefined) => PermissionService.canDeleteUser(role, targetRole),
+    canDeleteUser: (targetRole?: UserRole) => PermissionService.canDeleteUser(role, targetRole),
   };
 }
 

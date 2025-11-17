@@ -40,7 +40,7 @@ const tenantSchema = z.object({
   plan: z.enum(['FREE', 'BASIC', 'PRO', 'ENTERPRISE']),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'DELETED']),
   settings: z.object({
-    default_model: z.string().optional(),
+    default_model: z.string().nullable().optional(),
     chunk_size: z.number().optional(),
     chunk_overlap: z.number().optional(),
     max_queries_per_day: z.number().optional(),
