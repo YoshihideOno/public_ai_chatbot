@@ -23,8 +23,9 @@ jest.mock('@/lib/api', () => ({
 
 // useAuthをモック
 jest.mock('@/contexts/AuthContext', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     useAuth: () => ({
       user: {

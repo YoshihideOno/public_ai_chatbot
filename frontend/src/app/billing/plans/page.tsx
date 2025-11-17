@@ -3,11 +3,18 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 
+interface CheckoutError {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+  message?: string;
+}
+
 export default function BillingPlansPage() {
-  const { user } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,8 +24,13 @@ export default function BillingPlansPage() {
       setLoadingPlan(`${plan}_${billingCycle}`);
       const { url } = await apiClient.createCheckoutSession(plan, billingCycle);
       window.location.href = url;
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Checkoutセッションの作成に失敗しました');
+    } catch (error: unknown) {
+      const checkoutError = error as CheckoutError;
+      const message =
+        checkoutError.response?.data?.detail ??
+        checkoutError.message ??
+        'Checkoutセッションの作成に失敗しました';
+      setError(message);
       setLoadingPlan(null);
     }
   };

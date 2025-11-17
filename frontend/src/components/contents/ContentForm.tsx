@@ -49,14 +49,10 @@ import {
   Save, 
   FileText,
   Upload,
-  RefreshCw,
-  Trash2,
   File,
   FileSpreadsheet,
   FileCode,
-  FileType,
-  Download,
-  Copy
+  FileType
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -126,7 +122,7 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
   const [content, setContent] = useState<Content | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [inputType, setInputType] = useState<'file' | 'url'>('file');
@@ -254,9 +250,14 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
             file_url: urlInput.trim(),
           });
           // 202 Accepted（BG開始）の場合はモーダル風アラートで案内
-          const maybeAccepted = res as any;
-          if (maybeAccepted && typeof maybeAccepted === 'object' && maybeAccepted.status === 'PROCESSING') {
-            alert(maybeAccepted.message || '処理を開始しました。後で一覧で完了をご確認ください。');
+          if (
+            typeof res === 'object' &&
+            res !== null &&
+            'message' in res &&
+            res.status === 'PROCESSING'
+          ) {
+            const messageResponse = res as { message?: string };
+            alert(messageResponse.message || '処理を開始しました。後で一覧で完了をご確認ください。');
           }
         }
 
@@ -400,43 +401,6 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     } catch {
       // 無効なURLの場合はエラーを表示しない（入力中の場合があるため）
       setUrlFileType(null);
-    }
-  };
-
-  /**
-   * コンテンツ削除処理
-   * 確認ダイアログを表示してからコンテンツを削除し、
-   * 成功時はコンテンツ一覧ページに遷移します
-   */
-  const handleDeleteContent = async () => {
-    if (!contentId) return;
-
-    if (!confirm('このコンテンツを削除しますか？')) {
-      return;
-    }
-
-    try {
-      await apiClient.deleteContent(contentId);
-      router.push('/contents');
-    } catch (err: unknown) {
-      logger.error('コンテンツの削除に失敗', err);
-      setError('コンテンツの削除に失敗しました');
-    }
-  };
-
-  /**
-   * コンテンツ再インデックス処理
-   * コンテンツの再インデックスを開始します（実装予定）
-   */
-  const handleReindexContent = async () => {
-    if (!contentId) return;
-
-    try {
-      // TODO: 再インデックスAPIを実装
-      alert('再インデックスが開始されました');
-    } catch (err: unknown) {
-      logger.error('再インデックスの開始に失敗', err);
-      setError('再インデックスの開始に失敗しました');
     }
   };
 

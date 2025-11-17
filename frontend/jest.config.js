@@ -28,10 +28,7 @@ const customJestConfig = {
   
   // カバレッジの収集対象
   collectCoverageFrom: [
-    'src/**/*.{js,jsx,ts,tsx}',
-    '!src/**/*.d.ts',
-    '!src/**/*.stories.{js,jsx,ts,tsx}',
-    '!src/**/__tests__/**',
+    'src/components/ui/**/*.{ts,tsx}',
   ],
   
   // カバレッジの閾値

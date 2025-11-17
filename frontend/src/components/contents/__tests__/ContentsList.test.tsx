@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api'
 
 // date-fnsをモック
 jest.mock('date-fns', () => ({
-  format: jest.fn((date, formatStr) => {
+  format: jest.fn((date) => {
     if (!date) return ''
     const d = new Date(date)
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -35,8 +35,9 @@ jest.mock('@/lib/api', () => ({
 
 // useAuthをモック
 jest.mock('@/contexts/AuthContext', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
     useAuth: () => ({
       user: {
@@ -55,8 +56,9 @@ jest.mock('@/contexts/AuthContext', () => {
 
 // useRouterをモック
 jest.mock('next/navigation', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     useRouter: () => ({
       push: jest.fn(),
       replace: jest.fn(),
@@ -183,7 +185,6 @@ describe('ContentsList', () => {
   })
 
   test('エクスポート機能', async () => {
-    const user = userEvent.setup()
     const mockBlob = new Blob(['test content'], { type: 'text/csv' })
     const mockExportContents = jest.fn().mockResolvedValue({
       blob: mockBlob,

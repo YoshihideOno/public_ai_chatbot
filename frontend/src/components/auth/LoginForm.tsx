@@ -29,7 +29,6 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
 import { TenantRegistrationForm } from './TenantRegistrationForm';
 import { Loader2, Eye, EyeOff, LogIn, Building2 } from 'lucide-react';
 
@@ -50,7 +49,6 @@ export function LoginForm() {
    */
   const [activeTab, setActiveTab] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   

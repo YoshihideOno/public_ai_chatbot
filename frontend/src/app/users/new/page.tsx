@@ -1,13 +1,7 @@
 import { UserForm } from '@/components/users/UserForm';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-interface NewUserPageProps {
-  params: {
-    id?: string;
-  };
-}
-
-export default function NewUserPage({ params }: NewUserPageProps) {
+export default function NewUserPage() {
   return (
     <ProtectedRoute>
       <UserForm mode="create" />

@@ -7,7 +7,7 @@
 
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,35 @@ function VerifyEmailContent() {
   const [message, setMessage] = useState('');
   const [userEmail, setUserEmail] = useState('');
 
+  interface VerifyEmailError {
+    response?: {
+      data?: {
+        detail?: string;
+      };
+    };
+    message?: string;
+  }
+
+  const verifyEmail = useCallback(async (token: string) => {
+    try {
+      const apiClient = new ApiClient();
+      const response = await apiClient.verifyEmail(token);
+      
+      setStatus('success');
+      setMessage(response.message);
+      setUserEmail(response.email);
+    } catch (error: unknown) {
+      console.error('Email verification error:', error);
+      setStatus('error');
+      const verificationError = error as VerifyEmailError;
+      const detail =
+        verificationError.response?.data?.detail ??
+        verificationError.message ??
+        'メール確認処理中にエラーが発生しました。';
+      setMessage(detail);
+    }
+  }, []);
+
   useEffect(() => {
     if (!token) {
       setStatus('error');
@@ -38,27 +67,7 @@ function VerifyEmailContent() {
     }
 
     verifyEmail(token);
-  }, [token]);
-
-  const verifyEmail = async (token: string) => {
-    try {
-      const apiClient = new ApiClient();
-      const response = await apiClient.verifyEmail(token);
-      
-      setStatus('success');
-      setMessage(response.message);
-      setUserEmail(response.email);
-    } catch (error: any) {
-      console.error('Email verification error:', error);
-      setStatus('error');
-      
-      if (error.response?.data?.detail) {
-        setMessage(error.response.data.detail);
-      } else {
-        setMessage('メール確認処理中にエラーが発生しました。');
-      }
-    }
-  };
+  }, [token, verifyEmail]);
 
   const handleLoginRedirect = () => {
     window.location.href = '/login';

@@ -44,7 +44,6 @@ export function TenantApiKeys() {
   const [providers, setProviders] = useState<Array<{ provider: string; models: string[] }>>([]);
   const [apiKeys, setApiKeys] = useState<Array<{ id: string; provider: string; api_key_masked: string; model: string; is_active: boolean; created_at: string }>>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [showVerifySuccessDialog, setShowVerifySuccessDialog] = useState(false);
   const [showRegisterSuccessDialog, setShowRegisterSuccessDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

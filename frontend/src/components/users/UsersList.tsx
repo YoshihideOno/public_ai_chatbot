@@ -40,7 +40,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient, User } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { 
   Plus, 
@@ -70,7 +69,6 @@ export function UsersList() {
   const [totalPages, setTotalPages] = useState(0);
   const itemsPerPage = 20;
 
-  const { user: currentUser } = useAuth();
   const { canManageUsers, canDeleteUser } = usePermissions();
 
   const handleExport = async (format: 'csv' | 'json') => {

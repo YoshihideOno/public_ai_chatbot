@@ -113,13 +113,16 @@ export function TenantRegistrationForm() {
         router.push('/login');
       }
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Tenant registration error:', err);
-      
-      if (err.response?.data?.detail) {
-        setError(err.response.data.detail);
-      } else if (err.message) {
-        setError(err.message);
+      const registrationError = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      if (registrationError.response?.data?.detail) {
+        setError(registrationError.response.data.detail);
+      } else if (registrationError.message) {
+        setError(registrationError.message);
       } else {
         setError('アカウント登録に失敗しました。もう一度お試しください。');
       }

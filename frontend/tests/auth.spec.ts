@@ -352,8 +352,6 @@ test.describe('Complete User Flow', () => {
     
     const timestamp = Date.now();
     const testEmail = `reset-complete-${timestamp}@example.com`;
-    const oldPassword = 'OldPassword1';
-    const newPassword = 'NewPassword1';
     
     // メールアドレスを入力してリセット要求
     await page.fill('input[id="email"]', testEmail);
@@ -406,7 +404,7 @@ test.describe('Accessibility', () => {
     
     // Tabキーでボタンに移動（パスワード表示切り替えボタンなど他の要素をスキップ）
     // 複数回Tabキーを押してボタンに到達する
-    let submitButton = page.locator('button[type="submit"]');
+    const submitButton = page.locator('button[type="submit"]');
     let attempts = 0;
     while (attempts < 5 && !(await submitButton.evaluate(el => document.activeElement === el))) {
       await page.keyboard.press('Tab');

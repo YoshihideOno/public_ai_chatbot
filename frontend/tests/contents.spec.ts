@@ -177,8 +177,6 @@ test.describe('Content Form', () => {
       // エラーメッセージが見つからない場合、エラー要素を確認
       const errorElements = page.locator('.text-red-600').filter({ hasText: /タイトル/i });
       if (await errorElements.count() > 0) {
-        const errorText = await errorElements.first().textContent();
-        // エラーメッセージが表示されていることを確認
         await expect(errorElements.first()).toBeVisible({ timeout: 5000 });
       } else {
         // タイトルフィールドの近くにエラーメッセージがあるか確認

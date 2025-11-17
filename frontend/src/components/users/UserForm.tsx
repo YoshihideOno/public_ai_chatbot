@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { apiClient, User, ApiError } from '@/lib/api';
+import { apiClient, User } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   ArrowLeft, 
@@ -156,7 +156,7 @@ export function UserForm({ userId, mode }: UserFormProps) {
       console.error('Failed to save user:', err);
       
       if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { response?: { status?: number; data?: any } };
+        const axiosError = err as { response?: { status?: number; data?: { detail?: string; error?: { message?: string } } } };
         const message: string | undefined = axiosError.response?.data?.detail || axiosError.response?.data?.error?.message;
         // 重複メールの明示エラー
         if (axiosError.response?.status === 400 && message && message.toLowerCase().includes('email')) {

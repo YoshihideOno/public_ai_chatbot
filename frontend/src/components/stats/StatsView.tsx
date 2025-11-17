@@ -6,39 +6,29 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { apiClient } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { apiClient, type UsageStats, type DashboardStats } from '@/lib/api';
 import {
   BarChart3,
   TrendingUp,
   Clock,
-  Database,
   Activity,
-  AlertCircle,
-  Download
+  AlertCircle
 } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { subDays, startOfDay } from 'date-fns';
 
 export function StatsView() {
-  const [usageStats, setUsageStats] = useState<any>(null);
-  const [storageStats, setStorageStats] = useState<any>(null);
-  const [topQueries, setTopQueries] = useState<any[]>([]);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [storageStats, setStorageStats] = useState<DashboardStats['storage_stats'] | null>(null);
+  const [topQueries, setTopQueries] = useState<DashboardStats['top_queries']>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'today' | 'week' | 'month'>('month');
 
-  const { user } = useAuth();
-
-  useEffect(() => {
-    fetchStats();
-  }, [period]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -56,6 +46,9 @@ export function StatsView() {
       }
 
       let hasError = false;
+      let nextUsageStats: UsageStats | null = null;
+      let nextStorageStats: DashboardStats['storage_stats'] | null = null;
+      let nextTopQueries: DashboardStats['top_queries'] = [];
 
       // 利用統計を取得
       try {
@@ -64,7 +57,7 @@ export function StatsView() {
           endDate.toISOString(),
           'day'
         );
-        setUsageStats(usage);
+        nextUsageStats = usage;
       } catch (err) {
         console.error('Failed to fetch usage stats:', err);
         hasError = true;
@@ -75,10 +68,10 @@ export function StatsView() {
       try {
         const dashboard = await apiClient.getDashboardStats(period);
         if (dashboard.storage_stats) {
-          setStorageStats(dashboard.storage_stats);
+          nextStorageStats = dashboard.storage_stats;
         }
         if (dashboard.top_queries) {
-          setTopQueries(dashboard.top_queries);
+          nextTopQueries = dashboard.top_queries;
         }
       } catch (err) {
         console.error('Failed to fetch dashboard stats:', err);
@@ -87,16 +80,24 @@ export function StatsView() {
       }
 
       // すべてのAPIが失敗した場合、エラーメッセージを表示
-      if (hasError && !usageStats && !storageStats && topQueries.length === 0) {
+      setUsageStats(nextUsageStats);
+      setStorageStats(nextStorageStats);
+      setTopQueries(nextTopQueries);
+
+      if (hasError && !nextUsageStats && !nextStorageStats && nextTopQueries.length === 0) {
         setError('統計データの取得に失敗しました');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch stats:', err);
       setError('統計データの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [period]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   if (isLoading) {
     return (
@@ -268,7 +269,7 @@ export function StatsView() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topQueries.map((query: any, index: number) => (
+              {topQueries.map((query, index) => (
                 <div key={index} className="flex items-start justify-between p-3 border rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">

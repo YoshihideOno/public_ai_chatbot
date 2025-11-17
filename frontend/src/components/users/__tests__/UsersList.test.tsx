@@ -23,8 +23,9 @@ jest.mock('@/lib/api', () => ({
 
 // useAuthをモック
 jest.mock('@/contexts/AuthContext', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
     useAuth: () => ({
       user: {
@@ -45,14 +46,15 @@ jest.mock('@/contexts/AuthContext', () => {
 jest.mock('@/hooks/usePermissions', () => ({
   usePermissions: () => ({
     canManageUsers: true,
-    canDeleteUser: (role: string) => true, // 関数として提供
+    canDeleteUser: () => true, // 関数として提供
   }),
 }))
 
 // useRouterをモック
 jest.mock('next/navigation', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     useRouter: () => ({
       push: jest.fn(),
       replace: jest.fn(),

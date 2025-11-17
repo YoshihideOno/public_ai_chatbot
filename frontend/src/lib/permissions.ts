@@ -74,7 +74,7 @@ export class PermissionService {
   private static isRoleAtLeast(role: UserRole | undefined, allowed: UserRole[]): boolean {
     if (!role) {
       return false;
-    }
+  }
     return allowed.includes(role);
   }
 }

@@ -8,9 +8,12 @@ import React from 'react'
 import { render, screen } from '@/tests/utils'
 import { ConditionalLayout } from '../ConditionalLayout'
 
+const mockUsePathname = jest.fn(() => '/dashboard')
+
 // usePathnameをモック
 jest.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard',
+  __esModule: true,
+  usePathname: () => mockUsePathname(),
 }))
 
 describe('ConditionalLayout', () => {
@@ -26,7 +29,7 @@ describe('ConditionalLayout', () => {
   })
 
   test('ランディングページでのレイアウト表示', () => {
-    jest.spyOn(require('next/navigation'), 'usePathname').mockReturnValue('/')
+    mockUsePathname.mockReturnValue('/')
     
     render(
       <ConditionalLayout>

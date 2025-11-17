@@ -33,7 +33,8 @@ export default function TenantWebhookSettings() {
       const tenant = await apiClient.getTenant(tenantId);
       const settings = tenant?.settings || {};
       setEnableNotification(typeof settings.enable_webhook === "boolean" ? settings.enable_webhook : true);
-    } catch (e: unknown) {
+    } catch (error: unknown) {
+      console.error('Failed to load webhook settings', error);
       setError("設定の読み込みに失敗しました");
     } finally {
       setIsLoading(false);
@@ -58,8 +59,9 @@ export default function TenantWebhookSettings() {
       setSuccess("設定を保存しました");
       setShowSuccessDialog(true);
       await load();
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "設定の保存に失敗しました";
+    } catch (error: unknown) {
+      console.error('Failed to save webhook settings', error);
+      const message = error instanceof Error ? error.message : "設定の保存に失敗しました";
       setError(message);
     } finally {
       setIsLoading(false);

@@ -52,15 +52,26 @@ export function createMockResponse<T>(data: T, status: number = 200) {
  * @param status ステータスコード
  * @returns モックエラー
  */
-export function createMockError(message: string, status: number = 400) {
-  const error: any = new Error(message)
-  error.response = {
-    data: { error: { message } },
-    status,
-    statusText: 'Error',
-    headers: {},
-    config: {},
+interface MockApiError extends Error {
+  response: {
+    data: { error: { message: string } }
+    status: number
+    statusText: string
+    headers: Record<string, unknown>
+    config: Record<string, unknown>
   }
+}
+
+export function createMockError(message: string, status: number = 400) {
+  const error: MockApiError = Object.assign(new Error(message), {
+    response: {
+      data: { error: { message } },
+      status,
+      statusText: 'Error',
+      headers: {},
+      config: {},
+    },
+  })
   return error
 }
 

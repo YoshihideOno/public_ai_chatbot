@@ -23,8 +23,9 @@ jest.mock('@/lib/api', () => ({
 
 // useAuthをモック
 jest.mock('@/contexts/AuthContext', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
     useAuth: () => ({
       user: {
@@ -43,8 +44,9 @@ jest.mock('@/contexts/AuthContext', () => {
 
 // useRouterをモック
 jest.mock('next/navigation', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     useRouter: () => ({
       push: jest.fn(),
       replace: jest.fn(),
@@ -104,7 +106,6 @@ describe('TenantsList', () => {
   })
 
   test('検索機能', async () => {
-    const { TenantsList } = require('../TenantsList')
     const user = userEvent.setup()
     render(<TenantsList />)
     

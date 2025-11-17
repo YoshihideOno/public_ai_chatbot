@@ -55,21 +55,26 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // IntersectionObserverのモック
-global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  takeRecords() {
+class TestIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null
+  readonly rootMargin = ''
+  readonly thresholds: ReadonlyArray<number> = []
+  disconnect(): void {}
+  observe(): void {}
+  takeRecords(): IntersectionObserverEntry[] {
     return []
   }
-  unobserve() {}
-} as any
+  unobserve(): void {}
+}
+
+global.IntersectionObserver = TestIntersectionObserver
 
 // ResizeObserverのモック
-global.ResizeObserver = class ResizeObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
-} as any
+class TestResizeObserver implements ResizeObserver {
+  disconnect(): void {}
+  observe(): void {}
+  unobserve(): void {}
+}
+
+global.ResizeObserver = TestResizeObserver
 

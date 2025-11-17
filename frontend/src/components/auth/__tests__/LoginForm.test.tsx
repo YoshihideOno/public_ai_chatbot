@@ -8,8 +8,6 @@ import React from 'react'
 import { render, screen, waitFor } from '@/tests/utils'
 import userEvent from '@testing-library/user-event'
 import { LoginForm } from '../LoginForm'
-import { apiClient } from '@/lib/api'
-
 // apiClientをモック
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -17,23 +15,33 @@ jest.mock('@/lib/api', () => ({
   },
 }))
 
+const mockUseAuth = jest.fn(() => ({
+  login: jest.fn().mockResolvedValue(undefined),
+  user: null,
+  isLoading: false,
+  isAuthenticated: false,
+}))
+
 // useAuthをモック（AuthProviderもエクスポート）
 jest.mock('@/contexts/AuthContext', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    useAuth: () => ({
-      login: jest.fn().mockResolvedValue(undefined),
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-    }),
+    useAuth: () => mockUseAuth(),
   }
 })
 
 describe('LoginForm', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockUseAuth.mockReset()
+    mockUseAuth.mockReturnValue({
+      login: jest.fn().mockResolvedValue(undefined),
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+    })
   })
 
   test('フォームの初期表示', () => {
@@ -48,8 +56,7 @@ describe('LoginForm', () => {
   test('有効な入力でログイン成功', async () => {
     const user = userEvent.setup()
     const mockLogin = jest.fn().mockResolvedValue(undefined)
-    
-    jest.spyOn(require('@/contexts/AuthContext'), 'useAuth').mockReturnValue({
+    mockUseAuth.mockReturnValue({
       login: mockLogin,
       user: null,
       isLoading: false,
@@ -119,7 +126,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup()
     const mockLogin = jest.fn().mockResolvedValue(undefined)
     
-    jest.spyOn(require('@/contexts/AuthContext'), 'useAuth').mockReturnValue({
+    mockUseAuth.mockReturnValue({
       login: mockLogin,
       user: null,
       isLoading: false,
@@ -174,7 +181,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup()
     const mockLogin = jest.fn().mockRejectedValue(new Error('ログインに失敗しました'))
     
-    jest.spyOn(require('@/contexts/AuthContext'), 'useAuth').mockReturnValue({
+    mockUseAuth.mockReturnValue({
       login: mockLogin,
       user: null,
       isLoading: false,
@@ -200,7 +207,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup()
     const mockLogin = jest.fn().mockImplementation(() => new Promise(() => {})) // 解決しないPromise
     
-    jest.spyOn(require('@/contexts/AuthContext'), 'useAuth').mockReturnValue({
+    mockUseAuth.mockReturnValue({
       login: mockLogin,
       user: null,
       isLoading: false,

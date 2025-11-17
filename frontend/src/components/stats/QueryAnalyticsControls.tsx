@@ -30,7 +30,7 @@ export function QueryAnalyticsControls() {
     setError(null);
     setMessage(null);
     try {
-      const params: { locale: string; period: 'today' | 'week' | 'month' | 'custom'; start_date?: string; end_date?: string } = { locale, period } as any;
+      const params: Parameters<typeof apiClient.rebuildQueryAnalytics>[0] = { locale, period };
       if (period === 'custom') {
         if (!startDate || !endDate) {
           setError('custom期間では開始日と終了日が必要です');
@@ -42,11 +42,15 @@ export function QueryAnalyticsControls() {
       }
       await apiClient.rebuildQueryAnalytics(params);
       setMessage('再集計を実行しました');
-    } catch (e: any) {
+    } catch (error: unknown) {
       // サーバーからのエラーメッセージを優先表示
-      const apiMsg = e?.response?.data?.error?.message
-        || e?.response?.data?.message
-        || e?.message
+      const apiError = error as {
+        response?: { data?: { error?: { message?: string }; message?: string } };
+        message?: string;
+      };
+      const apiMsg = apiError.response?.data?.error?.message
+        || apiError.response?.data?.message
+        || apiError.message
         || '再集計の実行に失敗しました';
       setError(apiMsg);
     } finally {

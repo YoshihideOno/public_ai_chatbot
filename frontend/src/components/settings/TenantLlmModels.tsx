@@ -21,7 +21,6 @@ export function TenantLlmModels() {
 
   const [providers, setProviders] = useState<Array<{ provider: string; models: string[] }>>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -58,7 +57,6 @@ export function TenantLlmModels() {
     try {
       setIsLoading(true);
       setError(null);
-      setSuccess(null);
       if (!tenantId) {
         setError('テナントIDが取得できません');
         return;
@@ -69,7 +67,6 @@ export function TenantLlmModels() {
       };
       console.log('保存する設定:', settings);
       await apiClient.updateTenantSettings(tenantId, settings);
-      setSuccess('設定を保存しました');
       setShowSuccessDialog(true);
       // 保存後に再読み込み
       await load();

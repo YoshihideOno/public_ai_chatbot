@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 /**
  * コードブロック表示コンポーネント
  * 

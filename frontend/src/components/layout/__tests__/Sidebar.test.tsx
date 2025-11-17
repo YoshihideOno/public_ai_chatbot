@@ -23,8 +23,9 @@ jest.mock('lucide-react', () => ({
 
 // useAuthをモック
 jest.mock('@/contexts/AuthContext', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
     useAuth: () => ({
       user: {
@@ -51,8 +52,9 @@ jest.mock('@/hooks/usePermissions', () => ({
 
 // usePathnameをモック
 jest.mock('next/navigation', () => {
-  const React = require('react')
+  const React = jest.requireActual('react')
   return {
+    __esModule: true,
     usePathname: () => '/dashboard',
     Link: ({ children, href }: { children: React.ReactNode; href: string }) =>
       React.createElement('a', { href }, children),

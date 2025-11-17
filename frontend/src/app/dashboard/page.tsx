@@ -134,7 +134,7 @@ function DashboardContent() {
       console.error('Failed to fetch embed snippet:', err);
       if (err && typeof err === 'object') {
         if ('response' in err) {
-          const axiosError = err as { response?: { status?: number; data?: any }; request?: any; message?: string };
+          const axiosError = err as { response?: { status?: number; data?: unknown }; request?: unknown; message?: string };
           console.error('Error status:', axiosError.response?.status);
           console.error('Error data:', axiosError.response?.data);
           console.error('Error message:', axiosError.message);
@@ -148,13 +148,14 @@ function DashboardContent() {
     }
   }, [user?.tenant_id]);
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
       // ダッシュボード統計を取得
       const dashboardStats = await apiClient.getDashboardStats('month');
+      const storageStats = dashboardStats.storage_stats;
       
       // プラットフォーム管理者の場合、テナント状況の実データを取得
       let totalTenants = 0;
@@ -181,12 +182,12 @@ function DashboardContent() {
         totalUsers: totalUsers || (dashboardStats.usage_stats?.total_queries || 0),
         totalTenants: totalTenants || (dashboardStats.usage_stats?.unique_users || 0),
         activeTenants: activeTenants,
-        totalContents: dashboardStats.storage_stats?.total_files || 0,
+        totalContents: storageStats?.total_files || 0,
         totalQueries: dashboardStats.usage_stats?.total_queries || 0,
         activeUsers: dashboardStats.usage_stats?.unique_users || 0,
-        indexedContents: (dashboardStats.storage_stats as any)?.indexed_files ?? dashboardStats.storage_stats?.total_files ?? 0,
-        processingContents: (dashboardStats.storage_stats as any)?.processing_files ?? 0,
-        failedContents: (dashboardStats.storage_stats as any)?.failed_files ?? 0,
+        indexedContents: storageStats?.indexed_files ?? storageStats?.total_files ?? 0,
+        processingContents: storageStats?.processing_files ?? 0,
+        failedContents: storageStats?.failed_files ?? 0,
       });
     } catch (err: unknown) {
       console.error('Failed to fetch dashboard stats:', err);
@@ -194,7 +195,7 @@ function DashboardContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.role]);
 
   /**
    * システム設定状況を取得
@@ -244,7 +245,7 @@ function DashboardContent() {
       const requiredApiKeyCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
       const hasApiKey = apiKeyCount >= requiredApiKeyCount;
       
-      const statusCounts = (contentStats.status_counts || {}) as Record<string, number>;
+      const statusCounts = contentStats.status_counts ?? {};
       const indexedCount = typeof statusCounts['INDEXED'] === 'number' ? statusCounts['INDEXED'] : 0;
       const hasIndexedContent = indexedCount >= 1;
       const isReady = hasChatModel && hasEmbeddingModel && hasApiKey;
@@ -276,7 +277,7 @@ function DashboardContent() {
     fetchDashboardStats();
     fetchSystemConfigStatus();
     fetchTenantForEmbed();
-  }, [fetchSystemConfigStatus, fetchTenantForEmbed]);
+  }, [fetchDashboardStats, fetchSystemConfigStatus, fetchTenantForEmbed]);
 
   // 最近の活動取得
   useEffect(() => {

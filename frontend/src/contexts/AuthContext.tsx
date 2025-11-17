@@ -106,10 +106,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const userData = await apiClient.getCurrentUser();
       setUser(userData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 401エラー（認証失敗）やNetwork Errorは想定内の動作
       // トークンが無効な場合やサーバーが応答しない場合は静かに失敗
-      if (error.response?.status === 401 || error.code === 'ERR_NETWORK') {
+      const apiError = error as {
+        response?: { status?: number };
+        code?: string;
+      };
+      if (apiError.response?.status === 401 || apiError.code === 'ERR_NETWORK') {
         // 認証エラーまたはネットワークエラーの場合は静かに処理
         setUser(null);
         // トークンを削除（無効なトークンは保持しない）

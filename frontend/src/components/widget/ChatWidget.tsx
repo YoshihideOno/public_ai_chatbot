@@ -23,6 +23,21 @@ interface ChatWidgetProps {
   initialMessage?: string;
 }
 
+type RagChatInitOptions = {
+  tenantId: string;
+  apiKey: string;
+  apiBaseUrl: string;
+  theme: ChatWidgetProps['theme'];
+  position: ChatWidgetProps['position'];
+  initialMessage?: string;
+};
+
+declare global {
+  interface Window {
+    ragChat?: (action: 'init', options: RagChatInitOptions) => void;
+  }
+}
+
 /**
  * チャットウィジェットコンポーネント
  * 
@@ -73,20 +88,20 @@ export function ChatWidget({
   const widgetUrl = getWidgetUrl();
 
   useEffect(() => {
-    // ウィジェットが読み込まれた後に初期化
-    if (typeof window !== 'undefined' && (window as any).ragChat) {
-      if (widgetTenantId && widgetApiKey) {
-        (window as any).ragChat('init', {
-          tenantId: widgetTenantId,
-          apiKey: widgetApiKey,
-          apiBaseUrl: apiBaseUrl,
-          theme,
-          position,
-          initialMessage,
-        });
-      } else {
-        console.warn('チャットウィジェット: テナントIDまたはAPIキーが設定されていません');
-      }
+    if (typeof window === 'undefined' || !window.ragChat) {
+      return;
+    }
+    if (widgetTenantId && widgetApiKey) {
+      window.ragChat('init', {
+        tenantId: widgetTenantId,
+        apiKey: widgetApiKey,
+        apiBaseUrl,
+        theme,
+        position,
+        initialMessage,
+      });
+    } else {
+      console.warn('チャットウィジェット: テナントIDまたはAPIキーが設定されていません');
     }
   }, [widgetTenantId, widgetApiKey, apiBaseUrl, theme, position, initialMessage]);
 
@@ -105,12 +120,11 @@ export function ChatWidget({
         strategy="afterInteractive"
         src={widgetUrl}
         onLoad={() => {
-          // スクリプト読み込み後に初期化
-          if (typeof window !== 'undefined' && (window as any).ragChat) {
-            (window as any).ragChat('init', {
+          if (typeof window !== 'undefined' && window.ragChat && widgetTenantId && widgetApiKey) {
+            window.ragChat('init', {
               tenantId: widgetTenantId,
               apiKey: widgetApiKey,
-              apiBaseUrl: apiBaseUrl,
+              apiBaseUrl,
               theme,
               position,
               initialMessage,

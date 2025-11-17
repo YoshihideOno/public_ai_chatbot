@@ -3,7 +3,7 @@
 // テナントのテキスト分割設定（chunk_size, chunk_overlap）を編集するコンポーネント
 // 目的: テナント設定に保存された値を利用しつつ、必要に応じてユーザーが変更できるようにする
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ export default function TenantChunkSettings() {
       const settings = tenant?.settings || {};
       setChunkSize(typeof settings.chunk_size === "number" ? settings.chunk_size : 1024);
       setChunkOverlap(typeof settings.chunk_overlap === "number" ? settings.chunk_overlap : 200);
-    } catch (e: unknown) {
+    } catch (error: unknown) {
+      console.error('Failed to load chunk settings', error);
       setError("設定の読み込みに失敗しました");
     } finally {
       setIsLoading(false);
@@ -66,8 +67,9 @@ export default function TenantChunkSettings() {
       setSuccess("設定を保存しました");
       setShowSuccessDialog(true);
       await load();
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "設定の保存に失敗しました";
+    } catch (error: unknown) {
+      console.error('Failed to save chunk settings', error);
+      const message = error instanceof Error ? error.message : "設定の保存に失敗しました";
       setError(message);
     } finally {
       setIsLoading(false);
