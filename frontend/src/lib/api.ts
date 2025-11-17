@@ -14,16 +14,6 @@
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
-declare global {
-  interface Window {
-    __NEXT_DATA__?: {
-      env?: {
-        NEXT_PUBLIC_API_BASE_URL?: string;
-      };
-    };
-  }
-}
-
 // 型定義
 export interface User {
   id: string;
@@ -271,7 +261,13 @@ export class ApiClient {
         // ただし、NEXT_PUBLIC_*環境変数はビルド時に設定されるため、
         // 実行時に変更することはできません
         // そのため、Dockerコンテナ内で実行されている場合、host.docker.internalを使用
-        const envApiBaseUrl = window.__NEXT_DATA__?.env?.NEXT_PUBLIC_API_BASE_URL;
+        const envApiBaseUrl = (window as typeof window & {
+          __NEXT_DATA__?: {
+            env?: {
+              NEXT_PUBLIC_API_BASE_URL?: string;
+            };
+          };
+        }).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_BASE_URL;
         
         if (envApiBaseUrl) {
           browserBase = envApiBaseUrl;

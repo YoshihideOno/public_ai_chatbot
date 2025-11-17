@@ -245,8 +245,8 @@ function DashboardContent() {
       const requiredApiKeyCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
       const hasApiKey = apiKeyCount >= requiredApiKeyCount;
       
-      const statusCounts = contentStats.status_counts ?? {};
-      const indexedCount = typeof statusCounts['INDEXED'] === 'number' ? statusCounts['INDEXED'] : 0;
+      const statusCounts: Record<string, number> = contentStats.status_counts ?? {};
+      const indexedCount = statusCounts['INDEXED'] ?? 0;
       const hasIndexedContent = indexedCount >= 1;
       const isReady = hasChatModel && hasEmbeddingModel && hasApiKey;
 

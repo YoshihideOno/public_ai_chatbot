@@ -44,6 +44,7 @@ export function TenantApiKeys() {
   const [providers, setProviders] = useState<Array<{ provider: string; models: string[] }>>([]);
   const [apiKeys, setApiKeys] = useState<Array<{ id: string; provider: string; api_key_masked: string; model: string; is_active: boolean; created_at: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showVerifySuccessDialog, setShowVerifySuccessDialog] = useState(false);
   const [showRegisterSuccessDialog, setShowRegisterSuccessDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,7 +80,7 @@ export function TenantApiKeys() {
     try {
       setIsLoading(true);
       setError(null);
-      setSuccess(null);
+      setSuccessMessage(null);
       if (!selectedProvider || !selectedModel || !plainApiKey) {
         setError('プロバイダー、モデル、APIキーを入力してください');
         return;
@@ -88,7 +89,7 @@ export function TenantApiKeys() {
       await apiClient.createApiKey({ provider: selectedProvider, model: selectedModel, api_key: plainApiKey });
       setPlainApiKey('');
       setVerifyOk(false);
-      setSuccess('APIキーを登録しました');
+      setSuccessMessage('APIキーを登録しました');
       setShowRegisterSuccessDialog(true);
       await load();
     } catch (e: unknown) {
@@ -187,7 +188,7 @@ export function TenantApiKeys() {
       const res = await apiClient.verifyApiKeyInline({ provider: selectedProvider, model: selectedModel, api_key: plainApiKey });
       if (res.valid) {
         setVerifyOk(true);
-        setSuccess(`検証成功: ${res.provider} / ${res.model} (${res.message || 'OK'})`);
+        setSuccessMessage(`検証成功: ${res.provider} / ${res.model} (${res.message || 'OK'})`);
         setShowVerifySuccessDialog(true);
       } else {
         setVerifyOk(false);
@@ -221,6 +222,11 @@ export function TenantApiKeys() {
               APIキーが有効であることを確認しました。
             </DialogDescription>
           </DialogHeader>
+          {successMessage && (
+            <Alert>
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
           <DialogFooter>
             <Button onClick={() => setShowVerifySuccessDialog(false)}>閉じる</Button>
           </DialogFooter>
@@ -235,6 +241,11 @@ export function TenantApiKeys() {
               APIキーを正常に登録しました。
             </DialogDescription>
           </DialogHeader>
+          {successMessage && (
+            <Alert>
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
           <DialogFooter>
             <Button onClick={() => setShowRegisterSuccessDialog(false)}>閉じる</Button>
           </DialogFooter>
