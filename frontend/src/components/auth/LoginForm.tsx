@@ -138,7 +138,7 @@ export function LoginForm() {
                 </TabsTrigger>
                 <TabsTrigger value="register" className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
-                  テナント管理者登録
+                  アカウント登録
                 </TabsTrigger>
               </TabsList>
 

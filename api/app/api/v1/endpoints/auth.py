@@ -13,13 +13,13 @@
 - OAuth2認証
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
 from app.core.database import get_db
-from app.schemas.user import UserCreate, Token, UserLogin, PasswordReset, PasswordResetConfirm, User as UserSchema
+from app.schemas.user import UserCreate, Token, UserLogin, PasswordReset, PasswordResetConfirm, EmailVerification, User as UserSchema
 from app.models.user import User
 from app.schemas.tenant_registration import TenantRegistrationData, TenantRegistrationResponse
 from app.services.user_service import UserService
@@ -147,8 +147,8 @@ async def register(
 
 @router.post("/verify-email")
 async def verify_email(
-    token: str,
-    request: Request,
+    verification_data: EmailVerification,
+    request: Request = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -170,7 +170,7 @@ async def verify_email(
     """
     try:
         # トークンを検証
-        user = await TokenService.verify_token(db, token, "email_verification")
+        user = await TokenService.verify_token(db, verification_data.token, "email_verification")
         
         if not user:
             raise HTTPException(
@@ -202,7 +202,7 @@ async def verify_email(
     except HTTPException:
         raise
     except Exception as e:
-        ErrorLogger.log_exception(e, {"operation": "verify_email", "token": token})
+        ErrorLogger.log_exception(e, {"operation": "verify_email", "token": verification_data.token})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="メール確認処理に失敗しました"
@@ -344,8 +344,8 @@ async def login_oauth(
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
-    refresh_token: str,
-    request: Request,
+    refresh_token: str = Body(..., embed=True),
+    request: Request = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Refresh access token using refresh token"""
@@ -369,7 +369,7 @@ async def refresh_token(
         
         # Get user from database
         user_service = UserService(db)
-        user = await user_service.get_by_id(int(user_id))
+        user = await user_service.get_by_id(user_id)
         
         if not user or not user.is_active:
             raise HTTPException(
@@ -503,8 +503,8 @@ async def confirm_password_reset(
         
         # Update password
         user_service = UserService(db)
-        user = await user_service.get_by_id(int(user_id))
-        success = await user_service.update_password(int(user_id), reset_data.new_password)
+        user = await user_service.get_by_id(user_id)
+        success = await user_service.update_password(user_id, reset_data.new_password)
         
         if not success:
             raise HTTPException(
@@ -533,7 +533,7 @@ async def confirm_password_reset(
         )
 
 
-@router.post("/register-tenant", response_model=TenantRegistrationResponse)
+@router.post("/register-tenant", response_model=TenantRegistrationResponse, status_code=status.HTTP_201_CREATED)
 async def register_tenant(
     registration_data: TenantRegistrationData,
     db: AsyncSession = Depends(get_db)

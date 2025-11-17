@@ -29,7 +29,7 @@ class ApiKey(Base):
         tenant_id: 所属テナントID（外部キー）
         provider: LLMプロバイダー名（openai, anthropic, google等）
         api_key: APIキー文字列（暗号化して保存）
-        model: 使用するLLMモデル名
+        model_name: 使用するLLMモデル名
         is_active: アクティブ状態フラグ
         created_at: 作成日時
         updated_at: 更新日時
@@ -40,7 +40,7 @@ class ApiKey(Base):
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     provider = Column(String(50), nullable=False)
     api_key = Column(String(500), nullable=False)  # 暗号化して保存
-    model = Column(String(100), nullable=False)
+    model_name = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

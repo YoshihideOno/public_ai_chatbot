@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.api.v1.deps import get_current_user
 from app.schemas.user import User
 from app.services.billing_service import BillingService
-from app.utils.logging import BusinessLogger, ErrorLogger
+from app.utils.logging import BusinessLogger, logger
 import stripe
 
 router = APIRouter()
@@ -62,7 +62,7 @@ async def create_checkout_session(
     success_url = f"{settings.APP_URL}/billing/success"
     cancel_url = f"{settings.APP_URL}/billing/plans"
     try:
-        session = stripe.checkout.sessions.create(
+        session = stripe.checkout.Session.create(
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
@@ -73,12 +73,12 @@ async def create_checkout_session(
                 "billing_cycle": billing_cycle,
             },
         )
-        BusinessLogger.info(
+        logger.info(
             f"Checkoutセッション作成: tenant={current_user.tenant_id}, plan={plan}, cycle={billing_cycle}"
         )
         return {"session_id": session.id, "url": session.url}
     except Exception as e:
-        ErrorLogger.error(f"Stripeセッション作成失敗: {str(e)}")
+        logger.error(f"Stripeセッション作成失敗: {str(e)}")
         raise HTTPException(status_code=500, detail="Checkoutの作成に失敗しました")
 
 
@@ -102,14 +102,14 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         )
 
         event_type = event["type"]
-        BusinessLogger.info(f"Stripe Webhook受信: {event_type}")
+        logger.info(f"Stripe Webhook受信: {event_type}")
         # ここでBillingServiceを呼び出して各イベントを反映（省略）
         return {"received": True}
     except stripe.error.SignatureVerificationError as e:
-        ErrorLogger.error(f"Stripe署名検証失敗: {str(e)}")
+        logger.error(f"Stripe署名検証失敗: {str(e)}")
         raise HTTPException(status_code=400, detail="署名検証に失敗しました")
     except Exception as e:
-        ErrorLogger.error(f"Stripe Webhook処理エラー: {str(e)}")
+        logger.error(f"Stripe Webhook処理エラー: {str(e)}")
         raise HTTPException(status_code=400, detail="Webhook処理に失敗しました")
 
 

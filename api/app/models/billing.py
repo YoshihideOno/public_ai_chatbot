@@ -7,7 +7,7 @@ from app.core.database import Base
 class BillingInfo(Base):
     __tablename__ = "billing_info"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     tenant_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
     
     # Stripe
@@ -43,7 +43,7 @@ class BillingInfo(Base):
 class Invoice(Base):
     __tablename__ = "invoices"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     billing_info_id = Column(UUID(as_uuid=True), nullable=False)
     
     # Stripe

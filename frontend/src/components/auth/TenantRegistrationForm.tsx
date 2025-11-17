@@ -1,7 +1,7 @@
 /**
- * テナント登録フォームコンポーネント
+ * アカウント登録フォームコンポーネント
  * 
- * このファイルはテナント登録用のフォームコンポーネントを定義します。
+ * このファイルはアカウント登録用のフォームコンポーネントを定義します。
  * テナント作成とテナント管理者ユーザー作成を同時に行うためのフォームです。
  * 
  * 主な機能:
@@ -53,7 +53,7 @@ type TenantRegistrationFormData = z.infer<typeof tenantRegistrationSchema>;
 
 export function TenantRegistrationForm() {
   /**
-   * テナント登録フォームコンポーネント
+   * アカウント登録フォームコンポーネント
    * 
    * テナント作成とテナント管理者ユーザー作成を同時に行うフォームです。
    * バリデーション、エラーハンドリング、登録処理を統合的に管理します。
@@ -76,10 +76,10 @@ export function TenantRegistrationForm() {
 
   const onSubmit = async (data: TenantRegistrationFormData) => {
     /**
-     * テナント登録フォーム送信処理
+     * アカウント登録フォーム送信処理
      * 
      * 引数:
-     *   data: テナント登録フォームデータ
+     *   data: アカウント登録フォームデータ
      * 
      * 戻り値:
      *   Promise<void>: 非同期処理
@@ -102,7 +102,7 @@ export function TenantRegistrationForm() {
       
       // 登録成功時のダイアログ表示
       const confirmed = window.confirm(
-        `テナント登録が完了しました。\n\nテナント名: ${response.tenant_name}\n管理者メール: ${response.admin_email}\n\n確認メールを送付いたしました。\nメール内のリンクをクリックしてアカウントを有効化してください。`
+        `アカウント登録が完了しました。\n\nテナント名: ${response.tenant_name}\n管理者メール: ${response.admin_email}\n\n確認メールを送付いたしました。\nメール内のリンクをクリックしてアカウントを有効化してください。`
       );
       
       if (confirmed) {
@@ -121,7 +121,7 @@ export function TenantRegistrationForm() {
       } else if (err.message) {
         setError(err.message);
       } else {
-        setError('テナント登録に失敗しました。もう一度お試しください。');
+        setError('アカウント登録に失敗しました。もう一度お試しください。');
       }
     } finally {
       setIsLoading(false);
@@ -134,9 +134,9 @@ export function TenantRegistrationForm() {
         <div className="flex items-center justify-center mb-2">
           <Building2 className="h-8 w-8 text-blue-600" />
         </div>
-        <CardTitle className="text-2xl text-center">テナント管理者登録</CardTitle>
+        <CardTitle className="text-2xl text-center">アカウント登録</CardTitle>
         <CardDescription className="text-center">
-          新しいテナントとテナント管理者アカウントを同時に登録します
+          新しいテナントとテナント管理者を同時に登録します
         </CardDescription>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
           <p className="text-sm text-blue-800">
@@ -279,7 +279,7 @@ export function TenantRegistrationForm() {
           ) : (
             <>
               <Building2 className="mr-2 h-4 w-4" />
-              テナント管理者を登録
+              アカウントを登録
             </>
           )}
         </Button>

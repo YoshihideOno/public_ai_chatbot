@@ -165,7 +165,7 @@ async def update_tenant(
 async def delete_tenant(
     tenant_id: str,
     request: Request,
-    current_user: User = Depends(require_platform_admin),
+    current_user: User = Depends(require_platform_admin()),
     db: AsyncSession = Depends(get_db)
 ):
     """テナント削除（Platform Admin専用）"""

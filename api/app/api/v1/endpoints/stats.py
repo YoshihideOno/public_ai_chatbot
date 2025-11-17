@@ -158,7 +158,7 @@ async def get_top_queries(
 async def get_llm_usage_stats(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """LLM使用量統計取得"""
@@ -306,7 +306,7 @@ async def export_stats_csv(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     metric_type: str = Query("usage"),
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """統計データCSVエクスポート"""
@@ -352,7 +352,7 @@ async def export_stats_csv(
 @router.post("/alerts/rules", response_model=AlertRule)
 async def create_alert_rule(
     rule_data: AlertRule,
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """アラートルール作成"""
@@ -384,7 +384,7 @@ async def create_alert_rule(
 
 @router.get("/alerts", response_model=List[Alert])
 async def get_alerts(
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """アラート一覧取得"""
@@ -413,7 +413,7 @@ async def get_alerts(
 
 @router.get("/health", response_model=SystemHealth)
 async def get_system_health(
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """システムヘルスチェック"""
@@ -436,7 +436,7 @@ async def log_metric(
     metric_name: str,
     value: float,
     metadata: Optional[dict] = None,
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """メトリクスログ記録"""
@@ -470,7 +470,7 @@ async def log_metric(
 
 @router.get("/monitoring/config", response_model=MonitoringConfig)
 async def get_monitoring_config(
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """監視設定取得"""
@@ -507,7 +507,7 @@ async def get_monitoring_config(
 @router.put("/monitoring/config", response_model=MonitoringConfig)
 async def update_monitoring_config(
     config_data: MonitoringConfig,
-    current_user: User = Depends(require_admin_role),
+    current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
     """監視設定更新"""

@@ -452,7 +452,7 @@ class ApiKeyService:
                 tenant_id=row_mapping['tenant_id'],
                 provider=row_mapping['provider'],
                 api_key=row_mapping['api_key'],
-                model=model_value,
+                model_name=model_value,
                 is_active=row_mapping['is_active'],
                 created_at=row_mapping['created_at'],
                 updated_at=row_mapping['updated_at']
@@ -550,7 +550,7 @@ class ApiKeyService:
                 tenant_id=row['tenant_id'],
                 provider=row['provider'],
                 api_key=row['api_key'],
-                model=model_value,  # カラムが存在しない場合は空文字列
+                model_name=model_value,  # カラムが存在しない場合は空文字列
                 is_active=bool(row['is_active']),
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
@@ -674,13 +674,25 @@ class ApiKeyService:
             bool: 削除成功時True
         """
         try:
-            # APIキー取得
+            # APIキー取得（存在確認用）
             api_key = await self.get_api_key(api_key_id, tenant_id)
             if not api_key:
                 return False
             
-            await self.db.delete(api_key)
+            # 生SQLでDELETEを実行（get_api_keyで作成したオブジェクトはセッションに紐づいていないため）
+            delete_query = text("""
+                DELETE FROM api_keys
+                WHERE id = :api_key_id AND tenant_id = :tid
+            """)
+            result = await self.db.execute(
+                delete_query,
+                {"api_key_id": api_key_id, "tid": tenant_id}
+            )
             await self.db.commit()
+            
+            # 削除された行数が0の場合はFalseを返す
+            if result.rowcount == 0:
+                return False
             
             BusinessLogger.log_tenant_action(
                 tenant_id,
@@ -774,7 +786,7 @@ class ApiKeyService:
                 tenant_id=api_key_dict['tenant_id'],
                 provider=api_key_dict['provider'],
                 api_key=api_key_dict['api_key'],
-                model=api_key_dict.get('model', ''),
+                model_name=api_key_dict.get('model_name', api_key_dict.get('model', '')),
                 is_active=api_key_dict['is_active'],
                 created_at=api_key_dict['created_at'],
                 updated_at=api_key_dict['updated_at']

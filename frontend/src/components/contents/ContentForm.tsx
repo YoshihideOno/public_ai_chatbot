@@ -147,9 +147,12 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
     handleSubmit,
     setValue,
     watch,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm<ContentFormData>({
     resolver: zodResolver(contentSchema),
+    mode: 'onBlur', // フォーカスを外した時点でバリデーションを実行
+    reValidateMode: 'onBlur', // 再バリデーションもフォーカスを外した時点で実行
     defaultValues: {
       tags: [],
     },
@@ -576,11 +579,14 @@ export function ContentForm({ contentId, mode }: ContentFormProps) {
                       <Label htmlFor="title">タイトル</Label>
                       <Input
                         id="title"
-                        {...register('title')}
+                        {...register('title', {
+                          onBlur: () => trigger('title'), // フォーカスを外した時点でバリデーションを実行
+                        })}
                         disabled={isViewMode || !canManageContents}
+                        aria-invalid={errors.title ? 'true' : 'false'}
                       />
                       {errors.title && (
-                        <p className="text-sm text-red-600">{errors.title.message}</p>
+                        <p className="text-sm text-red-600" role="alert">{errors.title.message}</p>
                       )}
                     </div>
 

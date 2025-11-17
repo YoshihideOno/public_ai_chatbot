@@ -1,0 +1,337 @@
+# GitHub Actionsデプロイワークフロー
+# お披露目環境（Step1）とサービス提供環境（Step2）へのデプロイを手動で実行可能
+
+name: Deploy to Environments
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_step:
+        description: 'デプロイステップを選択'
+        required: true
+        type: choice
+        options:
+          - step1
+          - step2
+          - both
+      cloud_provider:
+        description: 'Step2実行時のクラウドプロバイダー（Step2またはboth選択時のみ有効）'
+        required: false
+        type: choice
+        options:
+          - aws
+          - azure
+      deploy_frontend:
+        description: 'フロントエンドをデプロイ'
+        required: true
+        type: boolean
+        default: true
+      deploy_backend:
+        description: 'バックエンドをデプロイ'
+        required: true
+        type: boolean
+        default: true
+      run_migration:
+        description: 'データベースマイグレーションを実行'
+        required: true
+        type: boolean
+        default: false
+      test_level:
+        description: 'テストレベル（quick: 高速テストのみ、full: 包括的テスト）'
+        required: true
+        type: choice
+        options:
+          - quick
+          - full
+        default: quick
+
+jobs:
+  # 段階的テスト実行（デプロイ前の必須チェック）
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # フロントエンド: 段階1（高速テスト・必須）
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Run TypeScript check
+        run: |
+          cd frontend
+          npx tsc --noEmit
+      
+      - name: Run ESLint
+        run: |
+          cd frontend
+          npm run lint
+      
+      - name: Build frontend application
+        run: |
+          cd frontend
+          npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      
+      # フロントエンド: 段階2（包括的テスト・オプション）
+      - name: Run Jest tests (full test level)
+        if: ${{ github.event.inputs.test_level == 'full' }}
+        run: |
+          cd frontend
+          npm test -- --coverage --maxWorkers=2
+      
+      # バックエンド: 段階1（高速テスト・必須）
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: api/requirements.txt
+      
+      - name: Install backend dependencies
+        run: |
+          cd api
+          pip install -r requirements.txt
+      
+      - name: Run database migrations (test)
+        run: |
+          cd api
+          alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+      
+      - name: Run pytest (quick - exclude slow tests)
+        if: ${{ github.event.inputs.test_level == 'quick' }}
+        run: |
+          cd api
+          pytest -v -m "not slow" --maxfail=5
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+      
+      # バックエンド: 段階2（包括的テスト・オプション）
+      - name: Run pytest (full - all tests)
+        if: ${{ github.event.inputs.test_level == 'full' }}
+        run: |
+          cd api
+          pytest -v --cov=app --cov-report=xml --cov-report=term
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+      
+      - name: Check migration status
+        run: |
+          cd api
+          alembic check
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+
+  # Step1: お披露目環境デプロイ
+  deploy-step1:
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event.inputs.deploy_step == 'step1' || github.event.inputs.deploy_step == 'both' }}
+    name: Deploy to Demo Environment
+    environment: demo
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # フロントエンド: Vercelデプロイ
+      - name: Deploy Frontend to Vercel (Demo)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          cd frontend
+          npm install -g vercel
+          vercel --prod --token ${{ secrets.VERCEL_DEMO_TOKEN }} \
+            --scope ${{ secrets.VERCEL_DEMO_SCOPE }} \
+            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.DEMO_API_BASE_URL }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_DEMO_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DEMO_PROJECT_ID }}
+      
+      # バックエンド: Railwayデプロイ
+      - name: Deploy Backend to Railway
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          cd api
+          npm install -g @railway/cli
+          railway login --token ${{ secrets.RAILWAY_TOKEN }}
+          railway up --service ${{ secrets.RAILWAY_DEMO_SERVICE }} --detach
+        env:
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_DEMO_PROJECT_ID }}
+      
+      # データベース: Neonマイグレーション
+      - name: Run database migration (Neon)
+        if: ${{ github.event.inputs.run_migration == 'true' }}
+        run: |
+          cd api
+          pip install -r requirements.txt
+          alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+      
+      # デプロイ後のヘルスチェック
+      - name: Health check (Demo API)
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          sleep 30
+          curl -f ${{ secrets.DEMO_API_BASE_URL }}/health || exit 1
+
+  # Step2: サービス提供環境デプロイ（AWS）
+  deploy-step2-aws:
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ (github.event.inputs.deploy_step == 'step2' || github.event.inputs.deploy_step == 'both') && github.event.inputs.cloud_provider == 'aws' }}
+    name: Deploy to Production (AWS)
+    environment: production-aws
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # AWS認証情報の設定
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      # フロントエンド: Vercelデプロイ（本番環境）
+      - name: Deploy Frontend to Vercel (Production)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          cd frontend
+          npm install -g vercel
+          vercel --prod --token ${{ secrets.VERCEL_PROD_TOKEN }} \
+            --scope ${{ secrets.VERCEL_PROD_SCOPE }} \
+            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_PROD_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROD_PROJECT_ID }}
+      
+      # バックエンド: ECRにイメージをプッシュ
+      - name: Build and push Docker image to ECR
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          cd api
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REGISTRY }}
+          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest .
+          docker push ${{ secrets.AWS_ECR_REGISTRY }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+      
+      # バックエンド: ECSサービスを更新
+      - name: Update ECS service
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          aws ecs update-service \
+            --cluster ${{ secrets.AWS_ECS_CLUSTER }} \
+            --service ${{ secrets.AWS_ECS_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
+      
+      # データベース: RDSマイグレーション
+      - name: Run database migration (AWS RDS)
+        if: ${{ github.event.inputs.run_migration == 'true' }}
+        run: |
+          cd api
+          pip install -r requirements.txt
+          alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL_AWS }}
+      
+      # デプロイ後のヘルスチェック
+      - name: Health check (Production API)
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          sleep 60
+          curl -f ${{ secrets.PROD_API_BASE_URL }}/health || exit 1
+
+  # Step2: サービス提供環境デプロイ（Azure）
+  deploy-step2-azure:
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ (github.event.inputs.deploy_step == 'step2' || github.event.inputs.deploy_step == 'both') && github.event.inputs.cloud_provider == 'azure' }}
+    name: Deploy to Production (Azure)
+    environment: production-azure
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Azure認証
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      # フロントエンド: Vercelデプロイ（本番環境）
+      - name: Deploy Frontend to Vercel (Production)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          cd frontend
+          npm install -g vercel
+          vercel --prod --token ${{ secrets.VERCEL_PROD_TOKEN }} \
+            --scope ${{ secrets.VERCEL_PROD_SCOPE }} \
+            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_PROD_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROD_PROJECT_ID }}
+      
+      # バックエンド: ACRにイメージをビルド・プッシュ
+      - name: Build and push Docker image to ACR
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          cd api
+          az acr build \
+            --registry ${{ secrets.AZURE_ACR_NAME }} \
+            --image api:latest \
+            --image api:${{ github.sha }} \
+            .
+      
+      # バックエンド: Container Instanceを更新
+      - name: Update Azure Container Instance
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          az container restart \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_CONTAINER_INSTANCE_NAME }}
+      
+      # データベース: Azure Databaseマイグレーション
+      - name: Run database migration (Azure Database)
+        if: ${{ github.event.inputs.run_migration == 'true' }}
+        run: |
+          cd api
+          pip install -r requirements.txt
+          alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL_AZURE }}
+      
+      # デプロイ後のヘルスチェック
+      - name: Health check (Production API)
+        if: ${{ github.event.inputs.deploy_backend == 'true' }}
+        run: |
+          sleep 60
+          curl -f ${{ secrets.PROD_API_BASE_URL }}/health || exit 1
+

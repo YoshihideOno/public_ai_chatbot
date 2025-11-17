@@ -204,9 +204,18 @@ async def upload_file(
     if tags:
         tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
     
+    # タイトルの決定（ファイル名が長すぎる場合は切り詰める）
+    if title:
+        final_title = title
+    else:
+        # ファイル名から拡張子を除いた部分をタイトルとして使用
+        filename_without_ext = file.filename.split('.')[0] if '.' in file.filename else file.filename
+        # 255文字以内に制限（Pydanticバリデーションに合わせる）
+        final_title = filename_without_ext[:255] if len(filename_without_ext) > 255 else filename_without_ext
+    
     # コンテンツデータ作成
     content_data = ContentCreate(
-        title=title or file.filename.split('.')[0],
+        title=final_title,
         content_type=file_type,
         description=description,
         tags=tag_list,

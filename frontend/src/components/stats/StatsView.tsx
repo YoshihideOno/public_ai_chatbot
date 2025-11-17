@@ -55,6 +55,8 @@ export function StatsView() {
         startDate = subDays(endDate, 30);
       }
 
+      let hasError = false;
+
       // 利用統計を取得
       try {
         const usage = await apiClient.getUsageStats(
@@ -65,6 +67,7 @@ export function StatsView() {
         setUsageStats(usage);
       } catch (err) {
         console.error('Failed to fetch usage stats:', err);
+        hasError = true;
         // エラーがあっても他の統計は表示する
       }
 
@@ -79,7 +82,13 @@ export function StatsView() {
         }
       } catch (err) {
         console.error('Failed to fetch dashboard stats:', err);
+        hasError = true;
         // エラーがあっても他の統計は表示する
+      }
+
+      // すべてのAPIが失敗した場合、エラーメッセージを表示
+      if (hasError && !usageStats && !storageStats && topQueries.length === 0) {
+        setError('統計データの取得に失敗しました');
       }
     } catch (err: any) {
       console.error('Failed to fetch stats:', err);

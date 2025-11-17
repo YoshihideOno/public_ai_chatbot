@@ -142,3 +142,7 @@ class PasswordResetConfirm(BaseModel):
         if not any(c.isdigit() for c in v):
             raise ValueError('パスワードには数字を含める必要があります')
         return v
+
+
+class EmailVerification(BaseModel):
+    token: str

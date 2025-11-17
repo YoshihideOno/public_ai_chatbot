@@ -22,11 +22,11 @@ async def test_rls_isolation():
 
         # insert tenants directly with SQL to avoid defaults complexity
         await db_session.execute(
-            text("INSERT INTO tenants(id, name, domain, api_key) VALUES (cast(:id as uuid), 'A', :domain, :api)"),
+            text("INSERT INTO tenants(id, name, domain, api_key, plan, status) VALUES (cast(:id as uuid), 'A', :domain, :api, 'FREE', 'ACTIVE')"),
             {"id": tenant_a, "domain": f"a-{tenant_a}.example", "api": f"k-{tenant_a}"},
         )
         await db_session.execute(
-            text("INSERT INTO tenants(id, name, domain, api_key) VALUES (cast(:id as uuid), 'B', :domain, :api)"),
+            text("INSERT INTO tenants(id, name, domain, api_key, plan, status) VALUES (cast(:id as uuid), 'B', :domain, :api, 'FREE', 'ACTIVE')"),
             {"id": tenant_b, "domain": f"b-{tenant_b}.example", "api": f"k-{tenant_b}"},
         )
         await db_session.commit()
@@ -40,6 +40,10 @@ async def test_rls_isolation():
         await repo.set_tenant_context(tenant_b)
         rows = await repo.fetch_all("SELECT current_setting('app.tenant_id')")
         assert rows and rows[0][0] == tenant_b
+        
+        # クリーンアップ
+        await db_session.execute(text("DELETE FROM tenants WHERE id IN (cast(:a as uuid), cast(:b as uuid))"), {"a": tenant_a, "b": tenant_b})
+        await db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -47,7 +51,7 @@ async def test_trgm_search():
     async with AsyncSessionLocal() as db_session:
         tenant_id = str(uuid.uuid4())
         await db_session.execute(
-            text("INSERT INTO tenants(id, name, domain, api_key) VALUES (cast(:id as uuid),'T', :domain, :api)"),
+            text("INSERT INTO tenants(id, name, domain, api_key, plan, status) VALUES (cast(:id as uuid),'T', :domain, :api, 'FREE', 'ACTIVE')"),
             {"id": tenant_id, "domain": f"t-{tenant_id}.example", "api": f"k-{tenant_id}"},
         )
         await db_session.commit()
@@ -56,14 +60,15 @@ async def test_trgm_search():
         file_id = str(uuid.uuid4())
         # create a user to satisfy files.uploaded_by FK
         user_id = str(uuid.uuid4())
+        unique_username = f"tester_{user_id[:8]}"  # 一意のユーザー名を生成
         await db_session.execute(text("""
-            INSERT INTO users(id, tenant_id, email, password_hash, name, role)
-            VALUES (cast(:uid as uuid), cast(:tid as uuid), :email, :ph, 'tester', 'OPERATOR')
-        """), {"uid": user_id, "tid": tenant_id, "email": f"t-{tenant_id}@example.com", "ph": "x"})
+            INSERT INTO users(id, tenant_id, email, hashed_password, username, role)
+            VALUES (cast(:uid as uuid), cast(:tid as uuid), :email, :ph, :username, 'OPERATOR')
+        """), {"uid": user_id, "tid": tenant_id, "email": f"t-{tenant_id}@example.com", "ph": "x", "username": unique_username})
         await db_session.commit()
         await db_session.execute(text("""
-            INSERT INTO files(id, tenant_id, file_name, file_type, size_bytes, status, s3_key, uploaded_by)
-            VALUES (cast(:id as uuid), cast(:tid as uuid), 'faq.pdf', 'PDF', 100, 'UPLOADED', 's3://x', cast(:uid as uuid))
+            INSERT INTO files(id, tenant_id, file_name, file_type, size_bytes, status, s3_key, uploaded_by, title)
+            VALUES (cast(:id as uuid), cast(:tid as uuid), 'faq.pdf', 'PDF', 100, 'UPLOADED', 's3://x', cast(:uid as uuid), 'FAQ PDF')
         """), {"id": file_id, "tid": tenant_id, "uid": user_id})
         await db_session.commit()
         await db_session.execute(text("""
@@ -78,6 +83,13 @@ async def test_trgm_search():
         chunks_repo = ChunkRepository(db_session)
         matches = await chunks_repo.search_trgm(tenant_id, "返品", limit=5)
         assert len(matches) >= 1
+        
+        # クリーンアップ
+        await db_session.execute(text("DELETE FROM chunks WHERE tenant_id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.execute(text("DELETE FROM files WHERE tenant_id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.execute(text("DELETE FROM users WHERE tenant_id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.execute(text("DELETE FROM tenants WHERE id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -85,7 +97,7 @@ async def test_vector_search():
     async with AsyncSessionLocal() as db_session:
         tenant_id = str(uuid.uuid4())
         await db_session.execute(
-            text("INSERT INTO tenants(id, name, domain, api_key) VALUES (cast(:id as uuid),'T', :domain, :api)"),
+            text("INSERT INTO tenants(id, name, domain, api_key, plan, status) VALUES (cast(:id as uuid),'T', :domain, :api, 'FREE', 'ACTIVE')"),
             {"id": tenant_id, "domain": f"t2-{tenant_id}.example", "api": f"k2-{tenant_id}"},
         )
         await db_session.commit()
@@ -93,14 +105,15 @@ async def test_vector_search():
         file_id = str(uuid.uuid4())
         # create a user to satisfy files.uploaded_by FK
         user_id = str(uuid.uuid4())
+        unique_username = f"tester_{user_id[:8]}"  # 一意のユーザー名を生成
         await db_session.execute(text("""
-            INSERT INTO users(id, tenant_id, email, password_hash, name, role)
-            VALUES (cast(:uid as uuid), cast(:tid as uuid), :email, :ph, 'tester', 'OPERATOR')
-        """), {"uid": user_id, "tid": tenant_id, "email": f"t2-{tenant_id}@example.com", "ph": "x"})
+            INSERT INTO users(id, tenant_id, email, hashed_password, username, role)
+            VALUES (cast(:uid as uuid), cast(:tid as uuid), :email, :ph, :username, 'OPERATOR')
+        """), {"uid": user_id, "tid": tenant_id, "email": f"t2-{tenant_id}@example.com", "ph": "x", "username": unique_username})
         await db_session.commit()
         await db_session.execute(text("""
-            INSERT INTO files(id, tenant_id, file_name, file_type, size_bytes, status, s3_key, uploaded_by)
-            VALUES (cast(:id as uuid), cast(:tid as uuid), 'kb.pdf', 'PDF', 10, 'UPLOADED', 's3://y', cast(:uid as uuid))
+            INSERT INTO files(id, tenant_id, file_name, file_type, size_bytes, status, s3_key, uploaded_by, title)
+            VALUES (cast(:id as uuid), cast(:tid as uuid), 'kb.pdf', 'PDF', 10, 'UPLOADED', 's3://y', cast(:uid as uuid), 'KB PDF')
         """), {"id": file_id, "tid": tenant_id, "uid": user_id})
         await db_session.commit()
         # two embeddings (toy vectors, 1536-dim)
@@ -134,5 +147,12 @@ async def test_vector_search():
         assert len(res) == 2
         # first one should be the closest
         assert res[0][1] <= res[1][1]
+        
+        # クリーンアップ
+        await db_session.execute(text("DELETE FROM chunks WHERE tenant_id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.execute(text("DELETE FROM files WHERE tenant_id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.execute(text("DELETE FROM users WHERE tenant_id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.execute(text("DELETE FROM tenants WHERE id = cast(:tid as uuid)"), {"tid": tenant_id})
+        await db_session.commit()
 
 

@@ -82,13 +82,13 @@ class ReminderService:
                 except Exception as e:
                     error_msg = f"テナント {tenant_info['tenant_id']} のリマインダー送信エラー: {str(e)}"
                     results["errors"].append(error_msg)
-                    ErrorLogger.error(error_msg)
+                    logger.error(error_msg)
             
-            BusinessLogger.info(f"リマインダー一括送信完了: {results}")
+            logger.info(f"リマインダー一括送信完了: {results}")
             return results
             
         except Exception as e:
-            ErrorLogger.error(f"リマインダー一括送信エラー: {str(e)}")
+            logger.error(f"リマインダー一括送信エラー: {str(e)}")
             raise
     
     async def _get_reminder_targets(self) -> List[Dict[str, Any]]:
@@ -151,7 +151,7 @@ class ReminderService:
             return reminder_targets
             
         except Exception as e:
-            ErrorLogger.error(f"リマインダー対象取得エラー: {str(e)}")
+            logger.error(f"リマインダー対象取得エラー: {str(e)}")
             raise
     
     async def _check_reminder_sent(self, tenant_id: str, days_before_expiry: int) -> bool:
@@ -177,7 +177,7 @@ class ReminderService:
             return result.scalar_one_or_none() is not None
             
         except Exception as e:
-            ErrorLogger.error(f"リマインダー送信済みチェックエラー: {str(e)}")
+            logger.error(f"リマインダー送信済みチェックエラー: {str(e)}")
             return False
     
     async def _send_email_reminder(self, tenant_info: Dict[str, Any]) -> bool:
@@ -216,7 +216,7 @@ class ReminderService:
             return email_sent
             
         except Exception as e:
-            ErrorLogger.error(f"メールリマインダー送信エラー: {str(e)}")
+            logger.error(f"メールリマインダー送信エラー: {str(e)}")
             # エラーログも記録
             await self._log_reminder(
                 tenant_info["tenant_id"],
@@ -279,7 +279,7 @@ class ReminderService:
             
         except Exception as e:
             await self.db.rollback()
-            ErrorLogger.error(f"ダッシュボード通知作成エラー: {str(e)}")
+            logger.error(f"ダッシュボード通知作成エラー: {str(e)}")
             return False
     
     async def _log_reminder(
@@ -318,7 +318,7 @@ class ReminderService:
             
         except Exception as e:
             await self.db.rollback()
-            ErrorLogger.error(f"リマインダーログ記録エラー: {str(e)}")
+            logger.error(f"リマインダーログ記録エラー: {str(e)}")
     
     async def get_tenant_notifications(
         self, 
@@ -345,7 +345,11 @@ class ReminderService:
                 query = query.where(Notification.user_id == user_id)
             
             if is_read is not None:
-                query = query.where(Notification.is_read == is_read)
+                # statusベースでフィルタリング（READ = 既読、PENDING = 未読）
+                if is_read:
+                    query = query.where(Notification.status == "READ")
+                else:
+                    query = query.where(Notification.status != "READ")
             
             query = query.order_by(Notification.created_at.desc()).limit(limit)
             
@@ -353,7 +357,7 @@ class ReminderService:
             return result.scalars().all()
             
         except Exception as e:
-            ErrorLogger.error(f"通知一覧取得エラー: {str(e)}")
+            logger.error(f"通知一覧取得エラー: {str(e)}")
             raise
     
     async def mark_notification_as_read(self, notification_id: str, user_id: str) -> bool:
@@ -388,5 +392,5 @@ class ReminderService:
             
         except Exception as e:
             await self.db.rollback()
-            ErrorLogger.error(f"通知既読更新エラー: {str(e)}")
+            logger.error(f"通知既読更新エラー: {str(e)}")
             raise

@@ -114,11 +114,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         else:
             expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         
+        import time
+        now = datetime.utcnow()
         to_encode.update({
             "exp": expire, 
-            "iat": datetime.utcnow(),
-            "type": "access"
+            "iat": now,
+            "jti": f"{data.get('sub', '')}-{time.time_ns()}",  # 一意性を保証するためのJWT ID
         })
+        # typeが既に設定されている場合は上書きしない
+        if "type" not in to_encode:
+            to_encode["type"] = "access"
         
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         logger.info(f"アクセストークン生成完了: ユーザーID {data.get('sub')}")
@@ -155,10 +160,13 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
         else:
             expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         
+        import time
+        now = datetime.utcnow()
         to_encode.update({
             "exp": expire, 
-            "iat": datetime.utcnow(), 
-            "type": "refresh"
+            "iat": now, 
+            "type": "refresh",
+            "jti": f"{data.get('sub', '')}-{time.time_ns()}",  # 一意性を保証するためのJWT ID
         })
         
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -194,7 +202,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         
         # トークンタイプの検証
         token_type = payload.get("type")
-        if token_type not in ["access", "refresh"]:
+        if token_type not in ["access", "refresh", "password_reset"]:
             logger.warning(f"無効なトークンタイプ: {token_type}")
             raise InvalidTokenError()
             

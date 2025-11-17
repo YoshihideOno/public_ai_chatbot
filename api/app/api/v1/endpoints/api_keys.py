@@ -204,7 +204,7 @@ async def create_api_key(
             tenant_id=str(api_key.tenant_id),
             provider=api_key.provider,
             api_key_masked=ApiKeyResponse.mask_api_key(api_key_data.api_key),
-            model=api_key.model,
+            model=getattr(api_key, 'model_name', getattr(api_key, 'model', '')),
             is_active=api_key.is_active,
             created_at=api_key.created_at,
             updated_at=api_key.updated_at

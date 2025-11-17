@@ -78,10 +78,13 @@ export function UserForm({ userId, mode }: UserFormProps) {
     setValue,
     reset,
     watch,
+    trigger,
     setError: setFormError,
     formState: { errors, isSubmitting },
   } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
+    mode: 'onBlur', // フォーカスを外した時点でバリデーションを実行
+    reValidateMode: 'onBlur', // 再バリデーションもフォーカスを外した時点で実行
     defaultValues: {
       email: '',
       username: '',
@@ -250,13 +253,16 @@ export function UserForm({ userId, mode }: UserFormProps) {
                     <Input
                       id="email"
                       type="email"
-                      {...register('email')}
+                      {...register('email', {
+                        onBlur: () => trigger('email'), // フォーカスを外した時点でバリデーションを実行
+                      })}
                       disabled={isViewMode || !canEdit}
                       autoComplete="off"
                       placeholder="例: user@example.com"
+                      aria-invalid={errors.email ? 'true' : 'false'}
                     />
                     {errors.email && (
-                      <p className="text-sm text-red-600">{errors.email.message}</p>
+                      <p className="text-sm text-red-600" role="alert">{errors.email.message}</p>
                     )}
                   </div>
                 </div>

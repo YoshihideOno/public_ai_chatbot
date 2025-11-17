@@ -242,8 +242,32 @@ export class ApiClient {
   constructor(baseURL?: string) {
     // ベースURLは常にブラウザ到達可能なURLを優先
     // SSRで初期化されても、NEXT_PUBLIC_API_BASE_URL もしくは localhost を使う
-    const browserBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-    this.baseURL = baseURL || browserBase;
+    // Dockerコンテナ内のブラウザからは、host.docker.internalを使用する必要がある
+    let browserBase = baseURL;
+    
+    if (!browserBase) {
+      // ブラウザ環境で実行されている場合、実行時に環境変数を読み込む
+      if (typeof window !== 'undefined') {
+        // 実行時にwindowオブジェクトから環境変数を取得（Next.jsのランタイム設定）
+        // ただし、NEXT_PUBLIC_*環境変数はビルド時に設定されるため、
+        // 実行時に変更することはできません
+        // そのため、Dockerコンテナ内で実行されている場合、host.docker.internalを使用
+        const envApiBaseUrl = (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_BASE_URL;
+        
+        if (envApiBaseUrl) {
+          browserBase = envApiBaseUrl;
+        } else {
+          // 環境変数が設定されていない場合、Dockerコンテナ内で実行されている可能性を考慮
+          // host.docker.internalを使用（WSL2環境ではextra_hostsで設定済み）
+          browserBase = 'http://host.docker.internal:8000';
+        }
+      } else {
+        // サーバーサイドでは、環境変数から取得
+        browserBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://fastapi:8000';
+      }
+    }
+    
+    this.baseURL = browserBase;
     
     this.client = axios.create({
       baseURL: `${this.baseURL}/api/v1`,

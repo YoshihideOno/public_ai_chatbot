@@ -27,7 +27,7 @@ router = APIRouter()
 
 @router.post("/send-reminders")
 async def send_trial_reminders(
-    current_user: User = Depends(require_platform_admin),
+    current_user: User = Depends(require_platform_admin()),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -59,7 +59,7 @@ async def send_trial_reminders(
         }
         
     except Exception as e:
-        ErrorLogger.error(f"リマインダー一括送信エラー: {str(e)}")
+        logger.error(f"リマインダー一括送信エラー: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="リマインダー送信に失敗しました"
@@ -120,7 +120,7 @@ async def get_notifications(
     except HTTPException:
         raise
     except Exception as e:
-        ErrorLogger.error(f"通知一覧取得エラー: {str(e)}")
+        logger.error(f"通知一覧取得エラー: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="通知一覧の取得に失敗しました"
@@ -169,7 +169,7 @@ async def mark_notification_as_read(
     except HTTPException:
         raise
     except Exception as e:
-        ErrorLogger.error(f"通知既読更新エラー: {str(e)}")
+        logger.error(f"通知既読更新エラー: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="通知の既読更新に失敗しました"
@@ -211,7 +211,7 @@ async def get_trial_status(
     except HTTPException:
         raise
     except Exception as e:
-        ErrorLogger.error(f"お試し利用期間状態取得エラー: {str(e)}")
+        logger.error(f"お試し利用期間状態取得エラー: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="お試し利用期間状態の取得に失敗しました"

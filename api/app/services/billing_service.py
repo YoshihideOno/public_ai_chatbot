@@ -13,8 +13,9 @@ Checkoutセッション作成、Webhookイベント処理、課金情報の更�
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Dict, Any
+import uuid
 from app.core.config import settings
-from app.utils.logging import BusinessLogger, ErrorLogger
+from app.utils.logging import BusinessLogger, ErrorLogger, logger
 from app.models.billing import BillingInfo, Invoice
 from sqlalchemy import select
 
@@ -48,15 +49,17 @@ class BillingService:
         戻り値:
             BillingInfo: 課金情報
         """
-        result = await self.db.execute(select(BillingInfo).where(BillingInfo.tenant_id == tenant_id))
+        from uuid import UUID as UUIDType
+        tenant_uuid = UUIDType(tenant_id) if isinstance(tenant_id, str) else tenant_id
+        result = await self.db.execute(select(BillingInfo).where(BillingInfo.tenant_id == tenant_uuid))
         info = result.scalar_one_or_none()
         if info:
             return info
-        info = BillingInfo(tenant_id=tenant_id, billing_email=billing_email or "")
+        info = BillingInfo(id=uuid.uuid4(), tenant_id=tenant_uuid, billing_email=billing_email or "")
         self.db.add(info)
         await self.db.commit()
         await self.db.refresh(info)
-        BusinessLogger.info(f"BillingInfo作成: tenant={tenant_id}")
+        logger.info(f"BillingInfo作成: tenant={tenant_id}")
         return info
 
     async def update_subscription_status(self, tenant_id: str, data: Dict[str, Any]) -> None:
@@ -76,6 +79,6 @@ class BillingService:
         for k, v in data.items():
             setattr(info, k, v)
         await self.db.commit()
-        BusinessLogger.info(f"課金情報更新: tenant={tenant_id}, fields={list(data.keys())}")
+        logger.info(f"課金情報更新: tenant={tenant_id}, fields={list(data.keys())}")
 
 

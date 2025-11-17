@@ -296,7 +296,7 @@ class Alert(BaseModel):
 
 
 class MonitoringConfig(BaseModel):
-    tenant_id: str
+    tenant_id: Optional[str] = None  # エンドポイントで自動設定されるためオプショナル
     enable_monitoring: bool = True
     alert_rules: List[AlertRule] = []
     notification_email: Optional[str] = None
