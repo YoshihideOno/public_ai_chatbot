@@ -10,11 +10,25 @@
 - ユーザーとの関連付け
 """
 
+import secrets
+import string
 from sqlalchemy import Column, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
+
+
+def generate_api_key() -> str:
+    """
+    APIキー生成関数
+    
+    テナント作成時に安全なランダムAPIキーを自動付与します。
+    戻り値:
+        str: 64文字の英数字で構成されたAPIキー
+    """
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(64))
 
 
 class Tenant(Base):
@@ -43,7 +57,7 @@ class Tenant(Base):
     domain = Column(String(255), nullable=False, unique=True)
     plan = Column(String(50), nullable=False, default="FREE")
     status = Column(String(50), nullable=False, default="ACTIVE")
-    api_key = Column(String(255), nullable=False, unique=True)
+    api_key = Column(String(255), nullable=False, unique=True, default=generate_api_key)
     settings = Column(JSONB, nullable=False, server_default='{}')
     knowledge_registered_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
