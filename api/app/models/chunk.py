@@ -13,7 +13,7 @@ RAGシステムにおけるベクトル検索の基盤となる重要なモデ�
 - インデックス管理
 """
 
-from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -43,6 +43,13 @@ class Chunk(Base):
     __tablename__ = "chunks"
     __table_args__ = (
         UniqueConstraint("file_id", "chunk_index", name="chunks_file_chunk_unique"),
+        Index(
+            "idx_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_l2_ops"},
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())

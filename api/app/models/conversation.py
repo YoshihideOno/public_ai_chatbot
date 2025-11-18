@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Integer
+from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -6,9 +6,12 @@ from app.core.database import Base
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    __table_args__ = (
+        Index("ix_conversations_tenant_id", "tenant_id"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     session_id = Column(String(255), nullable=False)
     user_input = Column(Text, nullable=False)
     bot_output = Column(Text, nullable=False)

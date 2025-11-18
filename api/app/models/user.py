@@ -12,7 +12,7 @@
 - アクティブ・非アクティブ状態の管理
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Enum, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -63,8 +63,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, index=True, server_default=func.gen_random_uuid())
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    username = Column(String(100), unique=True, index=True, nullable=False)
+    email = Column(String(255), nullable=False)
+    username = Column(String(100), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.OPERATOR)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True)
@@ -74,6 +74,21 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_users_email_active",
+            email,
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+        Index(
+            "uq_users_username_active",
+            username,
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+    )
     
     # Relationships
     tenant = relationship("Tenant", back_populates="users")

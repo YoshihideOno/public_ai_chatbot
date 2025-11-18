@@ -10,7 +10,7 @@ LLMプロバイダー毎のAPIキーとモデル設定を管理します。
 - テナント毎の独立したAPIキー設定
 """
 
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -35,6 +35,10 @@ class ApiKey(Base):
         updated_at: 更新日時
     """
     __tablename__ = "api_keys"
+    __table_args__ = (
+        Index("ix_api_keys_tenant_id", "tenant_id"),
+        Index("ix_api_keys_provider", "provider"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)

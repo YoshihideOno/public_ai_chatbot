@@ -10,7 +10,7 @@
 - メール・ダッシュボード通知の記録
 """
 
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Text, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -37,6 +37,9 @@ class ReminderLog(Base):
         failure_reason: 失敗理由
     """
     __tablename__ = "reminder_logs"
+    __table_args__ = (
+        Index("ix_reminder_logs_tenant_id", "tenant_id"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
@@ -72,6 +75,10 @@ class Notification(Base):
         created_at: 作成日時
     """
     __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_tenant_id", "tenant_id"),
+        Index("ix_notifications_user_id", "user_id"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)

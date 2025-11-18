@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, DateTime, Numeric, Integer
+from sqlalchemy import Column, String, Date, DateTime, Numeric, Integer, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -6,9 +6,12 @@ from app.core.database import Base
 
 class BillingInfo(Base):
     __tablename__ = "billing_info"
+    __table_args__ = (
+        Index("ix_billing_info_tenant_id", "tenant_id", unique=True),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, unique=True)
     
     # Stripe
     stripe_customer_id = Column(String(255), nullable=True, unique=True)
@@ -42,9 +45,12 @@ class BillingInfo(Base):
 
 class Invoice(Base):
     __tablename__ = "invoices"
+    __table_args__ = (
+        Index("ix_invoices_billing_info_id", "billing_info_id"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    billing_info_id = Column(UUID(as_uuid=True), nullable=False)
+    billing_info_id = Column(UUID(as_uuid=True), ForeignKey("billing_info.id"), nullable=False)
     
     # Stripe
     stripe_invoice_id = Column(String(255), nullable=True, unique=True)

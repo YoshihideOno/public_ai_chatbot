@@ -10,7 +10,7 @@
 - 期間別トップクエリ集計（回数、評価率、平均応答時間、クラスタ紐付け）の保存
 """
 
-from sqlalchemy import Column, String, DateTime, Integer, Numeric, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, DateTime, Integer, Numeric, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -42,10 +42,11 @@ class QueryCluster(Base):
             "tenant_id", "locale", "period_start", "period_end", "cluster_id",
             name="uq_query_clusters_scope_cluster"
         ),
+        Index("ix_query_clusters_tenant", "tenant_id"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False)
     locale = Column(String(10), nullable=False, index=True)
     period_start = Column(DateTime(timezone=True), nullable=False, index=True)
     period_end = Column(DateTime(timezone=True), nullable=False, index=True)
@@ -82,10 +83,11 @@ class TopQueryAggregate(Base):
             "tenant_id", "locale", "period_start", "period_end", "rank",
             name="uq_top_query_aggregates_scope_rank"
         ),
+        Index("ix_top_query_aggregates_tenant", "tenant_id"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False)
     locale = Column(String(10), nullable=False, index=True)
     period_start = Column(DateTime(timezone=True), nullable=False, index=True)
     period_end = Column(DateTime(timezone=True), nullable=False, index=True)
