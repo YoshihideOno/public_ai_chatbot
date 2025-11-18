@@ -20,11 +20,16 @@ def upgrade() -> None:
     """
     reminder_logsテーブルにdays_before_expiryカラムを追加します。
     """
-    # カラムが存在するかチェック
+    # テーブルが存在するかチェック
     from sqlalchemy import inspect, text
     connection = op.get_bind()
     inspector = inspect(connection)
     
+    # テーブルが存在する場合のみ処理
+    if 'reminder_logs' not in inspector.get_table_names():
+        return
+    
+    # カラムが存在するかチェック
     columns = [col['name'] for col in inspector.get_columns('reminder_logs')]
     if 'days_before_expiry' not in columns:
         op.add_column('reminder_logs', sa.Column('days_before_expiry', sa.String(length=10), nullable=True))
@@ -42,6 +47,10 @@ def downgrade() -> None:
     from sqlalchemy import inspect
     connection = op.get_bind()
     inspector = inspect(connection)
+    
+    # テーブルが存在する場合のみ処理
+    if 'reminder_logs' not in inspector.get_table_names():
+        return
     
     columns = [col['name'] for col in inspector.get_columns('reminder_logs')]
     if 'days_before_expiry' in columns:
