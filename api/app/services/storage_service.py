@@ -75,6 +75,8 @@ class LocalFileStorage(StorageService):
     開発環境でローカルファイルシステムにファイルを保存します。
     """
     
+    DEFAULT_FALLBACK_PATH = Path("/tmp/rag_storage")
+
     def __init__(self, base_path: str = None):
         """
         ローカルファイルストレージの初期化
@@ -82,10 +84,42 @@ class LocalFileStorage(StorageService):
         引数:
             base_path: ベースパス（デフォルト: settings.STORAGE_LOCAL_PATH）
         """
-        self.base_path = Path(base_path or settings.STORAGE_LOCAL_PATH)
-        # ディレクトリが存在しない場合は作成
-        self.base_path.mkdir(parents=True, exist_ok=True)
+        requested_path_str = base_path or settings.STORAGE_LOCAL_PATH or str(self.DEFAULT_FALLBACK_PATH)
+        requested_path = Path(requested_path_str)
+        self.base_path = self._prepare_base_path(requested_path)
         logger.info(f"LocalFileStorage initialized: {self.base_path}")
+
+    def _prepare_base_path(self, requested_path: Path) -> Path:
+        """
+        ベースパスの作成と書き込み確認を行い、失敗時はフォールバックパスを使用する
+        """
+        candidates = [requested_path]
+        if requested_path != self.DEFAULT_FALLBACK_PATH:
+            candidates.append(self.DEFAULT_FALLBACK_PATH)
+
+        last_error: Optional[Exception] = None
+
+        for candidate in candidates:
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                test_file = candidate / ".write_test"
+                test_file.write_text("")  # 書き込みテスト
+                test_file.unlink(missing_ok=True)
+                if candidate != requested_path:
+                    logger.warning(
+                        "LocalFileStorage: 指定パス %s は書き込み不可のため %s にフォールバックしました",
+                        requested_path,
+                        candidate,
+                    )
+                return candidate
+            except (OSError, PermissionError) as err:
+                last_error = err
+                logger.error(f"LocalFileStorage: パス {candidate} の初期化に失敗しました: {err}")
+
+        # すべての候補で失敗した場合は例外を送出
+        raise RuntimeError(
+            f"LocalFileStorage: 書き込み可能なストレージパスを確保できませんでした (last_error={last_error})"
+        )
     
     def _get_file_path(self, tenant_id: str, file_name: str) -> Path:
         """

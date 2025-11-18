@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     TIMEZONE: str = "Asia/Tokyo"
     
     # Storage
-    STORAGE_LOCAL_PATH: str = "/app/uploads"
+    STORAGE_LOCAL_PATH: str = "/tmp/rag_storage"
     BLOB_READ_WRITE_TOKEN: Optional[str] = None
     
     class Config:

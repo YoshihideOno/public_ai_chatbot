@@ -18,6 +18,8 @@ from httpx import AsyncClient, ASGITransport
 
 # テスト環境変数を設定（MissingGreenletエラーを回避するため）
 os.environ["ENVIRONMENT"] = "test"
+# ストレージは常に書き込み可能な /tmp 配下を使用
+os.environ.setdefault("STORAGE_LOCAL_PATH", "/tmp/rag_pytest_storage")
 
 # Ensure 'app' package is importable when running inside test container
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
