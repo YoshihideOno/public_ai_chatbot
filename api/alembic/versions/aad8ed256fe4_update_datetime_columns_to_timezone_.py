@@ -20,23 +20,31 @@ def upgrade() -> None:
     """
     すべてのDateTimeカラムをtimezone awareに変更
     """
-    # audit_logs テーブル
-    op.alter_column('audit_logs', 'created_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    table_names = inspector.get_table_names()
     
-    # conversations テーブル
-    op.alter_column('conversations', 'created_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
+    # audit_logs テーブル（存在する場合のみ処理）
+    if 'audit_logs' in table_names:
+        op.alter_column('audit_logs', 'created_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
     
-    # usage_logs テーブル
-    op.alter_column('usage_logs', 'created_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
+    # conversations テーブル（存在する場合のみ処理）
+    if 'conversations' in table_names:
+        op.alter_column('conversations', 'created_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
+    
+    # usage_logs テーブル（存在する場合のみ処理）
+    if 'usage_logs' in table_names:
+        op.alter_column('usage_logs', 'created_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
     
     # tenants テーブル
     op.alter_column('tenants', 'created_at',
@@ -81,10 +89,7 @@ def upgrade() -> None:
                    existing_nullable=False)
     
     # indexing_jobs テーブル（廃止されたテーブルのため、存在する場合のみ処理）
-    from sqlalchemy import inspect
-    conn = op.get_bind()
-    inspector = inspect(conn)
-    if 'indexing_jobs' in inspector.get_table_names():
+    if 'indexing_jobs' in table_names:
         op.alter_column('indexing_jobs', 'started_at',
                        existing_type=sa.DateTime(timezone=False),
                        type_=sa.DateTime(timezone=True),
@@ -102,64 +107,74 @@ def upgrade() -> None:
                        type_=sa.DateTime(timezone=True),
                        existing_nullable=False)
     
-    # billing_info テーブル
-    op.alter_column('billing_info', 'current_period_start',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=True)
-    op.alter_column('billing_info', 'current_period_end',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=True)
-    op.alter_column('billing_info', 'trial_end',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=True)
-    op.alter_column('billing_info', 'created_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
-    op.alter_column('billing_info', 'updated_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
+    # billing_info テーブル（存在する場合のみ処理）
+    if 'billing_info' in table_names:
+        op.alter_column('billing_info', 'current_period_start',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=True)
+        op.alter_column('billing_info', 'current_period_end',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=True)
+        op.alter_column('billing_info', 'trial_end',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=True)
+        op.alter_column('billing_info', 'created_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
+        op.alter_column('billing_info', 'updated_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
     
-    # invoices テーブル
-    op.alter_column('invoices', 'paid_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=True)
-    op.alter_column('invoices', 'created_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
-    op.alter_column('invoices', 'updated_at',
-                   existing_type=sa.DateTime(timezone=False),
-                   type_=sa.DateTime(timezone=True),
-                   existing_nullable=False)
+    # invoices テーブル（存在する場合のみ処理）
+    if 'invoices' in table_names:
+        op.alter_column('invoices', 'paid_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=True)
+        op.alter_column('invoices', 'created_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
+        op.alter_column('invoices', 'updated_at',
+                       existing_type=sa.DateTime(timezone=False),
+                       type_=sa.DateTime(timezone=True),
+                       existing_nullable=False)
 
 
 def downgrade() -> None:
     """
     すべてのDateTimeカラムをtimezone unawareに戻す
     """
-    # audit_logs テーブル
-    op.alter_column('audit_logs', 'created_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    table_names = inspector.get_table_names()
     
-    # conversations テーブル
-    op.alter_column('conversations', 'created_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
+    # audit_logs テーブル（存在する場合のみ処理）
+    if 'audit_logs' in table_names:
+        op.alter_column('audit_logs', 'created_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
     
-    # usage_logs テーブル
-    op.alter_column('usage_logs', 'created_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
+    # conversations テーブル（存在する場合のみ処理）
+    if 'conversations' in table_names:
+        op.alter_column('conversations', 'created_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
+    
+    # usage_logs テーブル（存在する場合のみ処理）
+    if 'usage_logs' in table_names:
+        op.alter_column('usage_logs', 'created_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
     
     # tenants テーブル
     op.alter_column('tenants', 'created_at',
@@ -204,10 +219,7 @@ def downgrade() -> None:
                    existing_nullable=False)
     
     # indexing_jobs テーブル（廃止されたテーブルのため、存在する場合のみ処理）
-    from sqlalchemy import inspect
-    conn = op.get_bind()
-    inspector = inspect(conn)
-    if 'indexing_jobs' in inspector.get_table_names():
+    if 'indexing_jobs' in table_names:
         op.alter_column('indexing_jobs', 'started_at',
                        existing_type=sa.DateTime(timezone=True),
                        type_=sa.DateTime(timezone=False),
@@ -225,38 +237,40 @@ def downgrade() -> None:
                        type_=sa.DateTime(timezone=False),
                        existing_nullable=False)
     
-    # billing_info テーブル
-    op.alter_column('billing_info', 'current_period_start',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=True)
-    op.alter_column('billing_info', 'current_period_end',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=True)
-    op.alter_column('billing_info', 'trial_end',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=True)
-    op.alter_column('billing_info', 'created_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
-    op.alter_column('billing_info', 'updated_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
+    # billing_info テーブル（存在する場合のみ処理）
+    if 'billing_info' in table_names:
+        op.alter_column('billing_info', 'current_period_start',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=True)
+        op.alter_column('billing_info', 'current_period_end',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=True)
+        op.alter_column('billing_info', 'trial_end',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=True)
+        op.alter_column('billing_info', 'created_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
+        op.alter_column('billing_info', 'updated_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
     
-    # invoices テーブル
-    op.alter_column('invoices', 'paid_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=True)
-    op.alter_column('invoices', 'created_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
-    op.alter_column('invoices', 'updated_at',
-                   existing_type=sa.DateTime(timezone=True),
-                   type_=sa.DateTime(timezone=False),
-                   existing_nullable=False)
+    # invoices テーブル（存在する場合のみ処理）
+    if 'invoices' in table_names:
+        op.alter_column('invoices', 'paid_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=True)
+        op.alter_column('invoices', 'created_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
+        op.alter_column('invoices', 'updated_at',
+                       existing_type=sa.DateTime(timezone=True),
+                       type_=sa.DateTime(timezone=False),
+                       existing_nullable=False)
