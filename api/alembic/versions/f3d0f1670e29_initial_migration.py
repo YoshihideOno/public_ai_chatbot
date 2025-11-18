@@ -1,7 +1,7 @@
 """initial_migration
 
 Revision ID: f3d0f1670e29
-Revises: 
+Revises: 03b760e5716a
 Create Date: 2025-10-18 12:42:18.149649
 
 """
@@ -12,7 +12,7 @@ from pgvector.sqlalchemy import Vector
 
 # revision identifiers, used by Alembic.
 revision = 'f3d0f1670e29'
-down_revision = None
+down_revision = '03b760e5716a'
 branch_labels = None
 depends_on = None
 
