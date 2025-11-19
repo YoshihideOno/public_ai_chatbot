@@ -164,12 +164,11 @@ jobs:
       - name: Deploy Frontend to Vercel (Demo)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
-          cd frontend
           npm install -g vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_DEMO_TOKEN }} \
             --scope ${{ secrets.VERCEL_DEMO_SCOPE }} \
-            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.DEMO_API_BASE_URL }} \
-            --cwd .
+            --cwd frontend \
+            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.DEMO_API_BASE_URL }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_DEMO_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DEMO_PROJECT_ID }}
@@ -225,12 +224,11 @@ jobs:
       - name: Deploy Frontend to Vercel (Production)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
-          cd frontend
           npm install -g vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_PROD_TOKEN }} \
             --scope ${{ secrets.VERCEL_PROD_SCOPE }} \
-            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }} \
-            --cwd .
+            --cwd frontend \
+            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_PROD_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROD_PROJECT_ID }}
@@ -292,12 +290,11 @@ jobs:
       - name: Deploy Frontend to Vercel (Production)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
-          cd frontend
           npm install -g vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_PROD_TOKEN }} \
             --scope ${{ secrets.VERCEL_PROD_SCOPE }} \
-            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }} \
-            --cwd .
+            --cwd frontend \
+            --env NEXT_PUBLIC_API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_PROD_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROD_PROJECT_ID }}
