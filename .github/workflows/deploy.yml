@@ -178,9 +178,9 @@ jobs:
         run: |
           cd api
           npm install -g @railway/cli
-          railway login --token ${{ secrets.RAILWAY_TOKEN }}
           railway up --service ${{ secrets.RAILWAY_DEMO_SERVICE }} --detach
         env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_DEMO_PROJECT_ID }}
       
       # データベース: Neonマイグレーション
