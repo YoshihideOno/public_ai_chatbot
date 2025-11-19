@@ -14,6 +14,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Alembicは同期処理のため、database.pyのエンジン作成をスキップする
+# database.pyをインポートする前に環境変数を設定
+os.environ["ALEMBIC_MIGRATION"] = "true"
+
 from app.core.database import Base  # noqa: E402
 from app import models  # noqa: F401,E402
 

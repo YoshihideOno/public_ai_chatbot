@@ -63,6 +63,12 @@
 - 外部キー制約を必ず設定
 - インデックスを適切に設定
 - RLS（Row Level Security）を実装
+- **SQLAlchemyモデルとAlembicマイグレーションの整合性**:
+  - 外部キー制約は`ForeignKey`を明示的に定義（`__table_args__`または`Column`定義で）
+  - インデックスは`__table_args__`で明示的に定義
+  - `server_default`を適切に設定（特に`created_at`、`updated_at`など）
+  - `NOT NULL`制約があるカラムには必ずデフォルト値を設定
+  - モデル定義とマイグレーションの差分を`alembic check`で定期的に確認
 
 ## セキュリティ要件
 - 認証：JWT + OAuth2
@@ -100,6 +106,25 @@
 - ブルーグリーンデプロイ
 - ロールバック戦略
 
+### CI/CD (GitHub Actions) ベストプラクティス
+- **Vercelデプロイ**:
+  - プロジェクトルートから`vercel`コマンドを実行（`cd frontend`は不要）
+  - Vercelプロジェクトの`Root Directory`設定と`--cwd`オプションの重複に注意
+  - `vercel.json`は`frontend`ディレクトリに配置するか、プロジェクトルートの設定と整合性を保つ
+  - `--yes`オプションで対話的プロンプトをスキップ
+- **Railwayデプロイ**:
+  - `railway login --token`は無効なコマンド（使用禁止）
+  - 環境変数`RAILWAY_TOKEN`を設定して認証（`railway login`コマンドは不要）
+  - `RAILWAY_PROJECT_ID`と`RAILWAY_TOKEN`は環境変数として設定
+- **環境変数管理**:
+  - 認証情報は必ずGitHub Secretsに保存
+  - 環境ごとに別々のSecretsを設定（`DEMO_*`, `PROD_*`など）
+  - 環境変数名は明確で一貫性のある命名規則を使用
+- **ストレージパス**:
+  - 書き込み権限のない環境（CI/CD）を考慮したフォールバック処理を実装
+  - `/tmp`ディレクトリをフォールバック先として使用可能にする
+  - パス設定は環境変数で管理し、デフォルト値を設定
+
 ## ドキュメント
 - API仕様：OpenAPI 3.0
 - アーキテクチャ：C4モデル
@@ -112,6 +137,11 @@
 - 同期処理での長時間処理
 - 例外の握りつぶし
 - デバッグ用のprint文
+- **CI/CD関連の禁止事項**:
+  - `railway login --token`コマンドの使用（無効なコマンド）
+  - Vercelデプロイ時の`cd frontend`と`--cwd`オプションの併用（パス重複の原因）
+  - 環境変数のハードコーディング（GitHub Secretsを使用）
+  - 書き込み権限を前提としたファイルパス設定（フォールバック処理なし）
 
 ## 推奨事項
 - 型安全性の重視

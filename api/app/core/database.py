@@ -19,30 +19,40 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 import logging
+import os
 
+# Alembic実行時はエンジンを作成しない（Alembicは同期処理のため）
 # Create async engine with optimized pool settings
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
-    poolclass=NullPool,  # 非同期エンジンではNullPoolを使用
-    connect_args={
-        "command_timeout": 30,  # コマンドタイムアウト（30秒）
-        "server_settings": {
-            "application_name": "ai_chatbot_api",
-            "lock_timeout": "30s",  # ロックタイムアウト（30秒）
-            "statement_timeout": "60s",  # ステートメントタイムアウト（60秒）
-            "timezone": "Asia/Tokyo",  # タイムゾーン設定
+if not os.getenv("ALEMBIC_MIGRATION"):
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.DEBUG,
+        future=True,
+        poolclass=NullPool,  # 非同期エンジンではNullPoolを使用
+        connect_args={
+            "command_timeout": 30,  # コマンドタイムアウト（30秒）
+            "server_settings": {
+                "application_name": "ai_chatbot_api",
+                "lock_timeout": "30s",  # ロックタイムアウト（30秒）
+                "statement_timeout": "60s",  # ステートメントタイムアウト（60秒）
+                "timezone": "Asia/Tokyo",  # タイムゾーン設定
+            }
         }
-    }
-)
+    )
+else:
+    # Alembic実行時はダミーエンジン（実際には使用されない）
+    engine = None
 
 # Create async session factory
-AsyncSessionLocal = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+if engine is not None:
+    AsyncSessionLocal = sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+else:
+    # Alembic実行時はダミーセッションファクトリ
+    AsyncSessionLocal = None
 
 # Create base class for models
 Base = declarative_base()
@@ -62,10 +72,12 @@ async def get_db() -> AsyncSession:
     例外:
         SQLAlchemyError: データベース接続エラー
     """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("データベースエンジンが初期化されていません")
     async with AsyncSessionLocal() as session:
         try:
             # NullPoolの場合は接続プール情報をスキップ
-            if hasattr(engine.pool, 'size'):
+            if engine is not None and hasattr(engine.pool, 'size'):
                 pool = engine.pool
                 logging.info(f"DB接続プール状態: size={pool.size()}, checked_in={pool.checkedin()}, checked_out={pool.checkedout()}, overflow={pool.overflow()}")
             else:
@@ -91,6 +103,8 @@ async def init_db():
     例外:
         SQLAlchemyError: テーブル作成エラー
     """
+    if engine is None:
+        raise RuntimeError("データベースエンジンが初期化されていません")
     try:
         async with engine.begin() as conn:
             # Import all models here to ensure they are registered
