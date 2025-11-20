@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config, pool, create_engine
 from alembic import context
 import os
 import sys
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(BASE_DIR)
@@ -24,6 +25,11 @@ from app import models  # noqa: F401,E402
 target_metadata = Base.metadata
 
 def _resolve_sync_db_url() -> str:
+    """
+    同期処理用のデータベースURLを解決する
+    
+    asyncpg用URLをpsycopg2用に変換し、SSLパラメータも適切に変換します。
+    """
     url = (
         os.getenv("DATABASE_URL_SYNC")
         or os.getenv("DATABASE_URL")
@@ -32,8 +38,25 @@ def _resolve_sync_db_url() -> str:
     if not url:
         raise RuntimeError("DATABASE_URL_SYNC も DATABASE_URL も設定されていません")
 
+    # asyncpg用URLをpsycopg2用に変換
     if url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://")
+    
+    # URLをパースして、SSLパラメータを変換
+    parsed = urlparse(url)
+    query_params = parse_qs(parsed.query)
+    
+    # ssl=true を sslmode=require に変換（psycopg2は ssl=true を理解しない）
+    if 'ssl' in query_params and query_params['ssl'] == ['true']:
+        del query_params['ssl']
+        if 'sslmode' not in query_params:
+            query_params['sslmode'] = ['require']
+    
+    # クエリパラメータを再構築
+    new_query = urlencode(query_params, doseq=True)
+    new_parsed = parsed._replace(query=new_query)
+    url = urlunparse(new_parsed)
+    
     return url
 
 
