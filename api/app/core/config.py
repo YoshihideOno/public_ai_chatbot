@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@db:5432/ai_chatbot_db"
+    ASYNC_DATABASE_URL: Optional[str] = None
+    DATABASE_URL_SYNC: Optional[str] = None
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -122,8 +124,15 @@ class Settings(BaseSettings):
                 logging.warning("デフォルトのSECRET_KEYが使用されています")
             
             # データベースURLのチェック
-            if not self.DATABASE_URL:
-                raise ValueError("DATABASE_URLが設定されていません")
+            effective_async_url = self.ASYNC_DATABASE_URL or self.DATABASE_URL
+            if not effective_async_url:
+                raise ValueError("ASYNC_DATABASE_URLまたはDATABASE_URLが設定されていません")
+
+            effective_sync_url = self.DATABASE_URL_SYNC or self.DATABASE_URL
+            if not effective_sync_url:
+                raise ValueError("DATABASE_URL_SYNCまたはDATABASE_URLが設定されていません")
+            if effective_sync_url.startswith("postgresql+asyncpg://"):
+                logging.warning("DATABASE_URL_SYNC に asyncpg 用URLが設定されています。postgresql:// 形式を推奨します。")
             
             # CORS設定のチェック
             if not self.BACKEND_CORS_ORIGINS:

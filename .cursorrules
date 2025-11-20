@@ -120,6 +120,7 @@
   - 認証情報は必ずGitHub Secretsに保存
   - 環境ごとに別々のSecretsを設定（`DEMO_*`, `PROD_*`など）
   - 環境変数名は明確で一貫性のある命名規則を使用
+  - データベース接続は `ASYNC_DATABASE_URL`（FastAPI）と `DATABASE_URL_SYNC`（Alembic）を分離し、`postgresql+asyncpg://` と `postgresql://` を使い分ける
 - **ストレージパス**:
   - 書き込み権限のない環境（CI/CD）を考慮したフォールバック処理を実装
   - `/tmp`ディレクトリをフォールバック先として使用可能にする

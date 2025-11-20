@@ -24,8 +24,12 @@ import os
 # Alembic実行時はエンジンを作成しない（Alembicは同期処理のため）
 # Create async engine with optimized pool settings
 if not os.getenv("ALEMBIC_MIGRATION"):
+    async_db_url = settings.ASYNC_DATABASE_URL or settings.DATABASE_URL
+    if not async_db_url:
+        raise RuntimeError("ASYNC_DATABASE_URLまたはDATABASE_URLが設定されていません")
+
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        async_db_url,
         echo=settings.DEBUG,
         future=True,
         poolclass=NullPool,  # 非同期エンジンではNullPoolを使用

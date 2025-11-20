@@ -23,14 +23,23 @@ from app import models  # noqa: F401,E402
 
 target_metadata = Base.metadata
 
-def run_migrations_offline():
-    # 環境変数からDATABASE_URLを取得、なければalembic.iniから取得
-    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
-    
-    # asyncpg URLをpsycopg2 URLに変換（Alembicは同期処理のため）
-    if url and "postgresql+asyncpg://" in url:
+def _resolve_sync_db_url() -> str:
+    url = (
+        os.getenv("DATABASE_URL_SYNC")
+        or os.getenv("DATABASE_URL")
+        or config.get_main_option("sqlalchemy.url")
+    )
+    if not url:
+        raise RuntimeError("DATABASE_URL_SYNC も DATABASE_URL も設定されていません")
+
+    if url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://")
-    
+    return url
+
+
+def run_migrations_offline():
+    url = _resolve_sync_db_url()
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -42,12 +51,7 @@ def run_migrations_offline():
 
 
 def run_migrations_online():
-    # 環境変数からDATABASE_URLを取得、なければalembic.iniから取得
-    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
-    
-    # asyncpg URLをpsycopg2 URLに変換（Alembicは同期処理のため）
-    if url and "postgresql+asyncpg://" in url:
-        url = url.replace("postgresql+asyncpg://", "postgresql://")
+    url = _resolve_sync_db_url()
     
     # 同期エンジンを作成
     connectable = create_engine(
