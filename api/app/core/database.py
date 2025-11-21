@@ -49,6 +49,7 @@ def _normalize_async_db_url(url: str) -> str:
     
     # デバッグ: パース前のクエリパラメータを確認
     if 'sslmode' in query_params or 'channel_binding' in query_params:
+        print(f"[DB DEBUG] URL正規化前のクエリパラメータ: sslmode={query_params.get('sslmode')}, channel_binding={query_params.get('channel_binding')}, ssl={query_params.get('ssl')}", flush=True)
         logging.warning(f"URL正規化前のクエリパラメータ: sslmode={query_params.get('sslmode')}, channel_binding={query_params.get('channel_binding')}, ssl={query_params.get('ssl')}")
     
     # sslmode=require を ssl=true に変換（asyncpgは sslmode を理解しない）
@@ -83,18 +84,28 @@ def _normalize_async_db_url(url: str) -> str:
     
     # デバッグ: 正規化後のURLにsslmodeが含まれていないか確認
     if 'sslmode' in url.lower():
+        print(f"[DB DEBUG] 警告: 正規化後のURLにsslmodeが含まれています: {url}", flush=True)
         logging.error(f"警告: 正規化後のURLにsslmodeが含まれています: {url}")
         # 再度パースして確認
         re_parsed = urlparse(url)
         re_query_params = parse_qs(re_parsed.query)
         if 'sslmode' in re_query_params:
+            print(f"[DB DEBUG] 再パース後のクエリパラメータにsslmodeが含まれています: {re_query_params.get('sslmode')}", flush=True)
             logging.error(f"再パース後のクエリパラメータにsslmodeが含まれています: {re_query_params.get('sslmode')}")
             # 強制的に削除
             del re_query_params['sslmode']
             new_query = urlencode(re_query_params, doseq=True)
             new_parsed = re_parsed._replace(query=new_query)
             url = urlunparse(new_parsed)
+            print(f"[DB DEBUG] sslmodeを強制的に削除しました: {url}", flush=True)
             logging.warning(f"sslmodeを強制的に削除しました: {url}")
+    
+    # 最終確認: 正規化後のURLにsslmodeが含まれていないか確認
+    final_parsed = urlparse(url)
+    final_query_params = parse_qs(final_parsed.query)
+    if 'sslmode' in final_query_params:
+        print(f"[DB DEBUG] エラー: 最終確認でsslmodeが検出されました: {final_query_params.get('sslmode')}", flush=True)
+        logging.error(f"エラー: 最終確認でsslmodeが検出されました: {final_query_params.get('sslmode')}")
     
     return url
 
@@ -117,7 +128,13 @@ if not os.getenv("ALEMBIC_MIGRATION"):
                 user_pass = auth_part.split(':', 1)
                 if len(user_pass) == 2:
                     original_url_for_log = f"{user_pass[0]}:****@{parts[1]}"
+    print(f"[DB DEBUG] 正規化前のDB URL: {original_url_for_log}", flush=True)
     logging.info(f"正規化前のDB URL: {original_url_for_log}")
+    
+    # sslmodeが含まれていないか確認（正規化前）
+    if 'sslmode' in async_db_url.lower():
+        print(f"[DB DEBUG] 警告: 正規化前のURLにsslmodeが含まれています: {original_url_for_log}", flush=True)
+        logging.warning(f"正規化前のURLにsslmodeが含まれています: {original_url_for_log}")
     
     # asyncpg用にURLを正規化（sslmodeをsslに変換）
     async_db_url_normalized = _normalize_async_db_url(async_db_url)
@@ -133,13 +150,41 @@ if not os.getenv("ALEMBIC_MIGRATION"):
                 user_pass = auth_part.split(':', 1)
                 if len(user_pass) == 2:
                     normalized_url_for_log = f"{user_pass[0]}:****@{parts[1]}"
+    print(f"[DB DEBUG] 正規化後のDB URL: {normalized_url_for_log}", flush=True)
     logging.info(f"正規化後のDB URL: {normalized_url_for_log}")
     
-    # sslmodeが含まれていないか確認
+    # sslmodeが含まれていないか確認（正規化後）
     if 'sslmode' in async_db_url_normalized.lower():
+        print(f"[DB DEBUG] エラー: 正規化後のURLにsslmodeが含まれています: {normalized_url_for_log}", flush=True)
         logging.error(f"警告: 正規化後のURLにsslmodeが含まれています: {normalized_url_for_log}")
+        # 強制的に削除を試みる
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        parsed = urlparse(async_db_url_normalized)
+        query_params = parse_qs(parsed.query)
+        if 'sslmode' in query_params:
+            del query_params['sslmode']
+            new_query = urlencode(query_params, doseq=True)
+            new_parsed = parsed._replace(query=new_query)
+            async_db_url_normalized = urlunparse(new_parsed)
+            print(f"[DB DEBUG] sslmodeを強制的に削除しました: {normalized_url_for_log}", flush=True)
+            logging.warning(f"sslmodeを強制的に削除しました")
     
     async_db_url = async_db_url_normalized
+    
+    # 最終確認: create_async_engineに渡される直前のURLを確認
+    final_check_parsed = urlparse(async_db_url)
+    final_check_query_params = parse_qs(final_check_parsed.query)
+    print(f"[DB DEBUG] create_async_engineに渡されるURLのクエリパラメータ: {final_check_query_params}", flush=True)
+    if 'sslmode' in final_check_query_params:
+        print(f"[DB DEBUG] エラー: create_async_engineに渡されるURLにsslmodeが含まれています: {final_check_query_params.get('sslmode')}", flush=True)
+        logging.error(f"エラー: create_async_engineに渡されるURLにsslmodeが含まれています: {final_check_query_params.get('sslmode')}")
+        # 最後の手段: sslmodeを削除
+        del final_check_query_params['sslmode']
+        new_query = urlencode(final_check_query_params, doseq=True)
+        new_parsed = final_check_parsed._replace(query=new_query)
+        async_db_url = urlunparse(new_parsed)
+        print(f"[DB DEBUG] 最後の手段でsslmodeを削除しました: {async_db_url}", flush=True)
+        logging.warning(f"最後の手段でsslmodeを削除しました")
 
     engine = create_async_engine(
         async_db_url,
