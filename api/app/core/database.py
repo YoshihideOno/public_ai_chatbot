@@ -175,24 +175,43 @@ if not os.getenv("ALEMBIC_MIGRATION"):
     final_check_parsed = urlparse(async_db_url)
     final_check_query_params = parse_qs(final_check_parsed.query)
     print(f"[DB DEBUG] create_async_engineに渡されるURLのクエリパラメータ: {final_check_query_params}", flush=True)
+    
+    # sslパラメータをconnect_argsに移動（URLから削除）
+    # asyncpgはURLクエリパラメータのssl=trueを正しく処理できない場合があるため、
+    # connect_argsで明示的に設定する
+    ssl_enabled = False
+    if 'ssl' in final_check_query_params:
+        ssl_value = final_check_query_params['ssl'][0] if final_check_query_params['ssl'] else None
+        if ssl_value and ssl_value.lower() in ['true', '1', 'yes']:
+            ssl_enabled = True
+        del final_check_query_params['ssl']
+    
+    # sslmodeが含まれている場合は削除
     if 'sslmode' in final_check_query_params:
         print(f"[DB DEBUG] エラー: create_async_engineに渡されるURLにsslmodeが含まれています: {final_check_query_params.get('sslmode')}", flush=True)
         logging.error(f"エラー: create_async_engineに渡されるURLにsslmodeが含まれています: {final_check_query_params.get('sslmode')}")
-        # 最後の手段: sslmodeを削除
         del final_check_query_params['sslmode']
-        new_query = urlencode(final_check_query_params, doseq=True)
-        new_parsed = final_check_parsed._replace(query=new_query)
-        async_db_url = urlunparse(new_parsed)
-        print(f"[DB DEBUG] 最後の手段でsslmodeを削除しました: {async_db_url}", flush=True)
-        logging.warning(f"最後の手段でsslmodeを削除しました")
+    
+    # channel_bindingが含まれている場合は削除（asyncpgでは使用されない）
+    if 'channel_binding' in final_check_query_params:
+        del final_check_query_params['channel_binding']
+    
+    # クエリパラメータを再構築（ssl, sslmode, channel_bindingを削除したURL）
+    new_query = urlencode(final_check_query_params, doseq=True)
+    new_parsed = final_check_parsed._replace(query=new_query)
+    async_db_url_clean = urlunparse(new_parsed)
+    
+    print(f"[DB DEBUG] クリーンアップ後のURL: {async_db_url_clean}", flush=True)
+    print(f"[DB DEBUG] SSL設定: {ssl_enabled}", flush=True)
 
     engine = create_async_engine(
-        async_db_url,
+        async_db_url_clean,
         echo=settings.DEBUG,
         future=True,
         poolclass=NullPool,  # 非同期エンジンではNullPoolを使用
         connect_args={
             "command_timeout": 30,  # コマンドタイムアウト（30秒）
+            "ssl": ssl_enabled,  # SSL接続を明示的に設定
             "server_settings": {
                 "application_name": "ai_chatbot_api",
                 "lock_timeout": "30s",  # ロックタイムアウト（30秒）
