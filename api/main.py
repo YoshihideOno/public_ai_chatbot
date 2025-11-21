@@ -42,15 +42,17 @@ def create_app() -> FastAPI:
     logger = logging.getLogger(__name__)
     
     # CORS設定をログ出力（起動時に確実に出力されるように）
+    cors_origins = settings.get_cors_origins()
     print(f"[CORS CONFIG] DEBUG mode: {settings.DEBUG}")
-    print(f"[CORS CONFIG] BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
+    print(f"[CORS CONFIG] BACKEND_CORS_ORIGINS raw: {settings.BACKEND_CORS_ORIGINS}")
     print(f"[CORS CONFIG] BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
+    print(f"[CORS CONFIG] Parsed CORS origins: {cors_origins}")
     logger.info(f"DEBUG mode: {settings.DEBUG}")
-    logger.info(f"BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
-    logger.info(f"BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
+    logger.info(f"BACKEND_CORS_ORIGINS raw: {settings.BACKEND_CORS_ORIGINS}")
+    logger.info(f"Parsed CORS origins: {cors_origins}")
     
     # 許可されたオリジンのリストを取得
-    allowed_origins = settings.BACKEND_CORS_ORIGINS if not settings.DEBUG else [
+    allowed_origins = cors_origins if not settings.DEBUG else [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
@@ -161,7 +163,7 @@ def create_app() -> FastAPI:
         
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=cors_origins,
+            allow_origins=settings.get_cors_origins(),
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             allow_headers=[

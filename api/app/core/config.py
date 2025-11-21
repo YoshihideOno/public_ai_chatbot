@@ -52,7 +52,10 @@ class Settings(BaseSettings):
     DATABASE_URL_SYNC: Optional[str] = None
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
+    # 環境変数から読み込む際は、カンマ区切りの文字列として扱う
+    # Pydantic SettingsがJSONとして解析しようとするのを防ぐため、
+    # 型をUnion[str, List[str]]にして、バリデーターでリストに変換する
+    BACKEND_CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:3000",
@@ -62,23 +65,47 @@ class Settings(BaseSettings):
     
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+    def parse_cors_origins(cls, v: Union[str, List[str], None]) -> Union[str, List[str]]:
         """
         CORSオリジンをパース
         
         環境変数からカンマ区切りの文字列として読み込まれた場合、
-        リストに変換します。
+        そのまま文字列として保持します（後でプロパティでリストに変換）。
+        JSONとして解析しようとした場合は、そのまま返します。
         
         引数:
-            v: 環境変数の値（文字列またはリスト）
+            v: 環境変数の値（文字列、リスト、またはNone）
             
+        戻り値:
+            Union[str, List[str]]: CORSオリジン（文字列またはリスト）
+        """
+        if v is None:
+            return []
+        if isinstance(v, str):
+            # 文字列の場合はそのまま返す（JSONとして解析されていない）
+            return v
+        elif isinstance(v, list):
+            # 既にリストの場合はそのまま返す
+            return v
+        else:
+            # その他の場合は空リストを返す
+            return []
+    
+    def get_cors_origins(self) -> List[str]:
+        """
+        CORSオリジンのリストを返す
+        
         戻り値:
             List[str]: CORSオリジンのリスト
         """
-        if isinstance(v, str):
-            # カンマ区切りの文字列をリストに変換
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        if isinstance(self.BACKEND_CORS_ORIGINS, list):
+            return self.BACKEND_CORS_ORIGINS
+        elif isinstance(self.BACKEND_CORS_ORIGINS, str):
+            if not self.BACKEND_CORS_ORIGINS.strip():
+                return []
+            return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",") if origin.strip()]
+        else:
+            return []
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -156,7 +183,8 @@ class Settings(BaseSettings):
                 logging.warning("DATABASE_URL_SYNC に asyncpg 用URLが設定されています。postgresql:// 形式を推奨します。")
             
             # CORS設定のチェック
-            if not self.BACKEND_CORS_ORIGINS:
+            cors_origins = self.get_cors_origins()
+            if not cors_origins:
                 logging.warning("CORS設定が空です")
 
             # Stripe/Resendの本番必須設定
