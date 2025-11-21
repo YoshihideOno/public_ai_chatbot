@@ -13,7 +13,8 @@ Pydantic Settingsを使用して環境変数から設定値を読み込み、型
 """
 
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from pydantic import field_validator
+from typing import List, Optional, Union
 import os
 import logging
 
@@ -58,6 +59,26 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
         "https://your-vercel-app.vercel.app",
     ]
+    
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        """
+        CORSオリジンをパース
+        
+        環境変数からカンマ区切りの文字列として読み込まれた場合、
+        リストに変換します。
+        
+        引数:
+            v: 環境変数の値（文字列またはリスト）
+            
+        戻り値:
+            List[str]: CORSオリジンのリスト
+        """
+        if isinstance(v, str):
+            # カンマ区切りの文字列をリストに変換
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"

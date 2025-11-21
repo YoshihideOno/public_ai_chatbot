@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
 import json
@@ -86,27 +85,36 @@ def create_app() -> FastAPI:
             ],
         )
     else:
+        # 本番環境: 環境変数で設定されたCORSオリジンを使用
+        # BACKEND_CORS_ORIGINSはカンマ区切りの文字列として環境変数から読み込まれる
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.BACKEND_CORS_ORIGINS,
             allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Accept-Language",
+                "Content-Language",
+                "Origin",
+                "X-Requested-With",
+                "X-Tenant-ID",  # Widget認証用
+                "X-API-Key",    # Widget認証用
+            ],
+            expose_headers=[
+                "Content-Length",
+                "Content-Type",
+                "X-Request-Id",
+            ],
         )
 
     # Trusted host middleware
-    if settings.BACKEND_CORS_ORIGINS:
-        # Extract hostnames from URLs for trusted hosts
-        trusted_hosts = []
-        for origin in settings.BACKEND_CORS_ORIGINS:
-            if origin.startswith("http://") or origin.startswith("https://"):
-                host = origin.split("://")[1].split(":")[0]
-                trusted_hosts.append(host)
-        
-        app.add_middleware(
-            TrustedHostMiddleware,
-            allowed_hosts=trusted_hosts + ["localhost", "127.0.0.1", "*"],
-        )
+    # OPTIONSリクエスト（CORSプリフライト）はスキップする必要があるため、
+    # TrustedHostMiddlewareは適用しない（CORSミドルウェアで制御）
+    # 本番環境では、CORSミドルウェアとリバースプロキシ（Railway/AWS）で
+    # ホスト検証を行う
 
     # Include API router
     app.include_router(api_router, prefix=settings.API_V1_STR)
