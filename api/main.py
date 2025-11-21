@@ -37,6 +37,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # OPTIONSリクエスト（CORSプリフライト）を明示的に処理
+    @app.middleware("http")
+    async def handle_options_request(request: Request, call_next):
+        # OPTIONSリクエストの場合は、CORSミドルウェアに処理を委譲
+        # このミドルウェアはCORSミドルウェアの前に実行されるため、
+        # ここでは何もせずに次のミドルウェアに渡す
+        response = await call_next(request)
+        return response
+    
     # リクエストボディをログに記録するミドルウェア
     @app.middleware("http")
     async def log_request_body(request: Request, call_next):
@@ -55,6 +64,14 @@ def create_app() -> FastAPI:
 
     # CORS middleware
     # 開発環境では広く許可し、運用環境では設定値に基づく厳格な許可を適用
+    # デバッグ用: CORS設定をログ出力
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"DEBUG mode: {settings.DEBUG}")
+    logger.info(f"BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
+    logger.info(f"BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
+    logger.info(f"BACKEND_CORS_ORIGINS length: {len(settings.BACKEND_CORS_ORIGINS) if isinstance(settings.BACKEND_CORS_ORIGINS, list) else 'N/A'}")
+    
     if settings.DEBUG:
         app.add_middleware(
             CORSMiddleware,
@@ -87,9 +104,18 @@ def create_app() -> FastAPI:
     else:
         # 本番環境: 環境変数で設定されたCORSオリジンを使用
         # BACKEND_CORS_ORIGINSはカンマ区切りの文字列として環境変数から読み込まれる
+        cors_origins = settings.BACKEND_CORS_ORIGINS
+        if not cors_origins or len(cors_origins) == 0:
+            logger.warning("BACKEND_CORS_ORIGINS is empty! CORS will block all requests.")
+            # フォールバック: デフォルト値を設定（本番環境では環境変数を設定すべき）
+            cors_origins = ["https://ai-chatbot-project-beta.vercel.app"]
+            logger.warning(f"Using fallback CORS origins: {cors_origins}")
+        else:
+            logger.info(f"Using CORS origins: {cors_origins}")
+        
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=settings.BACKEND_CORS_ORIGINS,
+            allow_origins=cors_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             allow_headers=[
@@ -118,6 +144,23 @@ def create_app() -> FastAPI:
 
     # Include API router
     app.include_router(api_router, prefix=settings.API_V1_STR)
+    
+    # OPTIONSリクエストを明示的に処理（CORSプリフライト用）
+    @app.options("/{full_path:path}")
+    async def options_handler(full_path: str, request: Request):
+        """
+        OPTIONSリクエスト（CORSプリフライト）を処理
+        
+        このエンドポイントは、CORSミドルウェアが処理できない場合の
+        フォールバックとして機能します。
+        """
+        from fastapi import Response
+        origin = request.headers.get("Origin")
+        logger.info(f"OPTIONS request for path: {full_path}, Origin: {origin}")
+        
+        # CORSミドルウェアが処理するため、ここでは空のレスポンスを返す
+        # 実際のCORSヘッダーはCORSミドルウェアが追加する
+        return Response(status_code=200)
 
     return app
 
