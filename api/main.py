@@ -40,32 +40,43 @@ def create_app() -> FastAPI:
     # ロガーを先に定義
     import logging
     logger = logging.getLogger(__name__)
+    
+    # CORS設定をログ出力（起動時に確実に出力されるように）
+    print(f"[CORS CONFIG] DEBUG mode: {settings.DEBUG}")
+    print(f"[CORS CONFIG] BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
+    print(f"[CORS CONFIG] BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
+    logger.info(f"DEBUG mode: {settings.DEBUG}")
+    logger.info(f"BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
+    logger.info(f"BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
+    
+    # 許可されたオリジンのリストを取得
+    allowed_origins = settings.BACKEND_CORS_ORIGINS if not settings.DEBUG else [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
+    print(f"[CORS CONFIG] Allowed origins: {allowed_origins}")
 
-    # OPTIONSリクエスト（CORSプリフライト）を明示的に処理
-    # CORSミドルウェアの前に実行されるため、ここでCORSヘッダーを手動で追加
+    # CORSヘッダーをすべてのリクエストに追加するミドルウェア
+    # RailwayのエッジサーバーがOPTIONSリクエストを処理する可能性があるため、
+    # すべてのレスポンスにCORSヘッダーを追加
     @app.middleware("http")
-    async def handle_options_request(request: Request, call_next):
+    async def add_cors_headers(request: Request, call_next):
         from fastapi import Response
         
-        # OPTIONSリクエストの場合、CORSヘッダーを手動で追加
+        origin = request.headers.get("Origin")
+        
+        # OPTIONSリクエストの場合は、即座にCORSヘッダーを返す
         if request.method == "OPTIONS":
-            origin = request.headers.get("Origin")
-            logger.info(f"OPTIONS request detected. Origin: {origin}")
-            logger.info(f"Allowed origins: {settings.BACKEND_CORS_ORIGINS if not settings.DEBUG else 'DEBUG mode'}")
+            print(f"[CORS] OPTIONS request detected. Origin: {origin}")
+            print(f"[CORS] Allowed origins: {allowed_origins}")
             
             # オリジンチェック
-            allowed_origins = settings.BACKEND_CORS_ORIGINS if not settings.DEBUG else [
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:3001",
-                "http://127.0.0.1:3001",
-                "http://localhost:8080",
-                "http://127.0.0.1:8080",
-            ]
-            
-            # オリジンが許可されているかチェック
-            if origin and (origin in allowed_origins or "*" in allowed_origins):
-                logger.info(f"Origin {origin} is allowed")
+            if origin and origin in allowed_origins:
+                print(f"[CORS] Origin {origin} is allowed")
                 response = Response(status_code=200)
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
@@ -74,11 +85,16 @@ def create_app() -> FastAPI:
                 response.headers["Access-Control-Max-Age"] = "600"
                 return response
             else:
-                logger.warning(f"Origin {origin} is not in allowed origins: {allowed_origins}")
-                # オリジンが許可されていない場合でも、CORSミドルウェアに処理を委譲
-                pass
+                print(f"[CORS] Origin {origin} is not in allowed origins: {allowed_origins}")
         
+        # 通常のリクエストの場合
         response = await call_next(request)
+        
+        # レスポンスにCORSヘッダーを追加
+        if origin and origin in allowed_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        
         return response
     
     # リクエストボディをログに記録するミドルウェア
@@ -99,11 +115,8 @@ def create_app() -> FastAPI:
 
     # CORS middleware
     # 開発環境では広く許可し、運用環境では設定値に基づく厳格な許可を適用
-    # デバッグ用: CORS設定をログ出力
-    logger.info(f"DEBUG mode: {settings.DEBUG}")
-    logger.info(f"BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
-    logger.info(f"BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
-    logger.info(f"BACKEND_CORS_ORIGINS length: {len(settings.BACKEND_CORS_ORIGINS) if isinstance(settings.BACKEND_CORS_ORIGINS, list) else 'N/A'}")
+    # 注意: 上記のミドルウェアでCORSヘッダーを追加しているため、
+    # このCORSミドルウェアは補助的な役割を果たします
     
     if settings.DEBUG:
         app.add_middleware(
