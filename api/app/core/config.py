@@ -166,10 +166,18 @@ class Settings(BaseSettings):
         """
         try:
             # 必須設定のチェック
+            # ENVIRONMENTがproductionの場合のみ、SECRET_KEYのチェックを厳格に行う
+            # ただし、マイグレーション実行時はSECRET_KEYがなくても続行できるようにする
             if not self.SECRET_KEY or self.SECRET_KEY == "your-secret-key-change-in-production":
                 if self.ENVIRONMENT == "production":
-                    raise ValueError("本番環境ではSECRET_KEYを設定してください")
-                logging.warning("デフォルトのSECRET_KEYが使用されています")
+                    # マイグレーション実行時（alembic）は警告のみ
+                    import sys
+                    if "alembic" in sys.modules or "alembic" in " ".join(sys.argv):
+                        logging.warning("本番環境でSECRET_KEYが設定されていません（マイグレーション実行中）")
+                    else:
+                        raise ValueError("本番環境ではSECRET_KEYを設定してください")
+                else:
+                    logging.warning("デフォルトのSECRET_KEYが使用されています")
             
             # データベースURLのチェック
             effective_async_url = self.ASYNC_DATABASE_URL or self.DATABASE_URL
@@ -208,8 +216,23 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 起動時の設定バリデーション
+# マイグレーション実行時（alembic）は、SECRET_KEYなどの一部のバリデーションをスキップ
+import sys
+is_migration = "alembic" in sys.modules or any("alembic" in arg for arg in sys.argv)
+
 try:
-    settings.validate_settings()
+    if is_migration:
+        # マイグレーション実行時は、SECRET_KEYのチェックをスキップ
+        logging.info("マイグレーション実行中: 一部のバリデーションをスキップします")
+        # データベース接続のチェックのみ実行
+        effective_async_url = settings.ASYNC_DATABASE_URL or settings.DATABASE_URL
+        if not effective_async_url:
+            raise ValueError("ASYNC_DATABASE_URLまたはDATABASE_URLが設定されていません")
+        effective_sync_url = settings.DATABASE_URL_SYNC or settings.DATABASE_URL
+        if not effective_sync_url:
+            raise ValueError("DATABASE_URL_SYNCまたはDATABASE_URLが設定されていません")
+    else:
+        settings.validate_settings()
 except Exception as e:
     logging.error(f"設定初期化エラー: {str(e)}")
     raise
