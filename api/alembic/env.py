@@ -37,7 +37,7 @@ def _resolve_sync_db_url() -> str:
     )
     if not url:
         raise RuntimeError("DATABASE_URL_SYNC も DATABASE_URL も設定されていません")
-
+    
     # asyncpg用URLをpsycopg2用に変換
     if url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://")
@@ -62,7 +62,7 @@ def _resolve_sync_db_url() -> str:
 
 def run_migrations_offline():
     url = _resolve_sync_db_url()
-
+    
     context.configure(
         url=url,
         target_metadata=target_metadata,

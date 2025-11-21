@@ -18,8 +18,86 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import logging
 import os
+
+
+def _normalize_async_db_url(url: str) -> str:
+    """
+    asyncpg用のデータベースURLを正規化する
+    
+    asyncpgは`sslmode`パラメータを理解しないため、`sslmode=require`を`ssl=true`に変換します。
+    また、`postgresql://`形式のURLを`postgresql+asyncpg://`に変換します。
+    
+    引数:
+        url: データベース接続URL
+        
+    戻り値:
+        str: 正規化されたURL
+    """
+    if not url:
+        return url
+    
+    # postgresql:// を postgresql+asyncpg:// に変換（未設定の場合）
+    if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
+    # URLをパースして、SSLパラメータを変換
+    parsed = urlparse(url)
+    query_params = parse_qs(parsed.query)
+    
+    # デバッグ: パース前のクエリパラメータを確認
+    if 'sslmode' in query_params or 'channel_binding' in query_params:
+        logging.warning(f"URL正規化前のクエリパラメータ: sslmode={query_params.get('sslmode')}, channel_binding={query_params.get('channel_binding')}, ssl={query_params.get('ssl')}")
+    
+    # sslmode=require を ssl=true に変換（asyncpgは sslmode を理解しない）
+    if 'sslmode' in query_params:
+        sslmode_value = query_params['sslmode'][0] if query_params['sslmode'] else None
+        del query_params['sslmode']
+        # sslmodeがrequire, verify-ca, verify-fullの場合はssl=trueに変換
+        if sslmode_value in ['require', 'verify-ca', 'verify-full']:
+            if 'ssl' not in query_params:
+                query_params['ssl'] = ['true']
+        elif sslmode_value == 'disable':
+            if 'ssl' not in query_params:
+                query_params['ssl'] = ['false']
+        # allow, preferの場合はssl=trueに変換（安全のため）
+        elif sslmode_value in ['allow', 'prefer']:
+            if 'ssl' not in query_params:
+                query_params['ssl'] = ['true']
+        # sslmodeが空文字列や無効な値の場合はssl=trueに変換（安全のため）
+        elif not sslmode_value or sslmode_value not in ['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full']:
+            logging.warning(f"無効なsslmode値 '{sslmode_value}' を検出しました。ssl=trueに変換します。")
+            if 'ssl' not in query_params:
+                query_params['ssl'] = ['true']
+    
+    # channel_bindingパラメータはasyncpgでは無視されるが、削除しておく
+    if 'channel_binding' in query_params:
+        del query_params['channel_binding']
+    
+    # クエリパラメータを再構築
+    new_query = urlencode(query_params, doseq=True)
+    new_parsed = parsed._replace(query=new_query)
+    url = urlunparse(new_parsed)
+    
+    # デバッグ: 正規化後のURLにsslmodeが含まれていないか確認
+    if 'sslmode' in url.lower():
+        logging.error(f"警告: 正規化後のURLにsslmodeが含まれています: {url}")
+        # 再度パースして確認
+        re_parsed = urlparse(url)
+        re_query_params = parse_qs(re_parsed.query)
+        if 'sslmode' in re_query_params:
+            logging.error(f"再パース後のクエリパラメータにsslmodeが含まれています: {re_query_params.get('sslmode')}")
+            # 強制的に削除
+            del re_query_params['sslmode']
+            new_query = urlencode(re_query_params, doseq=True)
+            new_parsed = re_parsed._replace(query=new_query)
+            url = urlunparse(new_parsed)
+            logging.warning(f"sslmodeを強制的に削除しました: {url}")
+    
+    return url
+
 
 # Alembic実行時はエンジンを作成しない（Alembicは同期処理のため）
 # Create async engine with optimized pool settings
@@ -27,6 +105,41 @@ if not os.getenv("ALEMBIC_MIGRATION"):
     async_db_url = settings.ASYNC_DATABASE_URL or settings.DATABASE_URL
     if not async_db_url:
         raise RuntimeError("ASYNC_DATABASE_URLまたはDATABASE_URLが設定されていません")
+    
+    # デバッグ用: 正規化前のURLをログ出力（パスワード部分はマスク）
+    original_url_for_log = async_db_url
+    if '@' in original_url_for_log:
+        # パスワード部分をマスク
+        parts = original_url_for_log.split('@')
+        if len(parts) == 2:
+            auth_part = parts[0]
+            if ':' in auth_part:
+                user_pass = auth_part.split(':', 1)
+                if len(user_pass) == 2:
+                    original_url_for_log = f"{user_pass[0]}:****@{parts[1]}"
+    logging.info(f"正規化前のDB URL: {original_url_for_log}")
+    
+    # asyncpg用にURLを正規化（sslmodeをsslに変換）
+    async_db_url_normalized = _normalize_async_db_url(async_db_url)
+    
+    # デバッグ用: 正規化後のURLをログ出力（パスワード部分はマスク）
+    normalized_url_for_log = async_db_url_normalized
+    if '@' in normalized_url_for_log:
+        # パスワード部分をマスク
+        parts = normalized_url_for_log.split('@')
+        if len(parts) == 2:
+            auth_part = parts[0]
+            if ':' in auth_part:
+                user_pass = auth_part.split(':', 1)
+                if len(user_pass) == 2:
+                    normalized_url_for_log = f"{user_pass[0]}:****@{parts[1]}"
+    logging.info(f"正規化後のDB URL: {normalized_url_for_log}")
+    
+    # sslmodeが含まれていないか確認
+    if 'sslmode' in async_db_url_normalized.lower():
+        logging.error(f"警告: 正規化後のURLにsslmodeが含まれています: {normalized_url_for_log}")
+    
+    async_db_url = async_db_url_normalized
 
     engine = create_async_engine(
         async_db_url,
