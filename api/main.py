@@ -37,12 +37,47 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # ロガーを先に定義
+    import logging
+    logger = logging.getLogger(__name__)
+
     # OPTIONSリクエスト（CORSプリフライト）を明示的に処理
+    # CORSミドルウェアの前に実行されるため、ここでCORSヘッダーを手動で追加
     @app.middleware("http")
     async def handle_options_request(request: Request, call_next):
-        # OPTIONSリクエストの場合は、CORSミドルウェアに処理を委譲
-        # このミドルウェアはCORSミドルウェアの前に実行されるため、
-        # ここでは何もせずに次のミドルウェアに渡す
+        from fastapi import Response
+        
+        # OPTIONSリクエストの場合、CORSヘッダーを手動で追加
+        if request.method == "OPTIONS":
+            origin = request.headers.get("Origin")
+            logger.info(f"OPTIONS request detected. Origin: {origin}")
+            logger.info(f"Allowed origins: {settings.BACKEND_CORS_ORIGINS if not settings.DEBUG else 'DEBUG mode'}")
+            
+            # オリジンチェック
+            allowed_origins = settings.BACKEND_CORS_ORIGINS if not settings.DEBUG else [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:3001",
+                "http://127.0.0.1:3001",
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
+            ]
+            
+            # オリジンが許可されているかチェック
+            if origin and (origin in allowed_origins or "*" in allowed_origins):
+                logger.info(f"Origin {origin} is allowed")
+                response = Response(status_code=200)
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Accept, Accept-Language, Authorization, Content-Language, Content-Type, Origin, X-API-Key, X-Requested-With, X-Tenant-ID"
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Max-Age"] = "600"
+                return response
+            else:
+                logger.warning(f"Origin {origin} is not in allowed origins: {allowed_origins}")
+                # オリジンが許可されていない場合でも、CORSミドルウェアに処理を委譲
+                pass
+        
         response = await call_next(request)
         return response
     
@@ -65,8 +100,6 @@ def create_app() -> FastAPI:
     # CORS middleware
     # 開発環境では広く許可し、運用環境では設定値に基づく厳格な許可を適用
     # デバッグ用: CORS設定をログ出力
-    import logging
-    logger = logging.getLogger(__name__)
     logger.info(f"DEBUG mode: {settings.DEBUG}")
     logger.info(f"BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"BACKEND_CORS_ORIGINS type: {type(settings.BACKEND_CORS_ORIGINS)}")
