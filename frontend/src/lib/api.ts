@@ -255,22 +255,26 @@ export class ApiClient {
     let browserBase = baseURL;
     
     if (!browserBase) {
+      const staticEnvBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
       // ブラウザ環境で実行されている場合、実行時に環境変数を読み込む
       if (typeof window !== 'undefined') {
         // 実行時にwindowオブジェクトから環境変数を取得（Next.jsのランタイム設定）
-        // ただし、NEXT_PUBLIC_*環境変数はビルド時に設定されるため、
-        // 実行時に変更することはできません
-        // そのため、Dockerコンテナ内で実行されている場合、host.docker.internalを使用
-        const envApiBaseUrl = (window as typeof window & {
+        const runtimeEnvBase = (window as typeof window & {
           __NEXT_DATA__?: {
             env?: {
               NEXT_PUBLIC_API_BASE_URL?: string;
             };
           };
         }).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_BASE_URL;
-        
-        if (envApiBaseUrl) {
-          browserBase = envApiBaseUrl;
+
+        if (runtimeEnvBase) {
+          browserBase = runtimeEnvBase;
+        } else if (staticEnvBase) {
+          // ビルド時に埋め込まれた環境変数を優先
+          browserBase = staticEnvBase;
+        } else if (window.location?.origin?.startsWith('http')) {
+          // 同一オリジンホスティング時はフロントと同じオリジンにフォールバック
+          browserBase = window.location.origin;
         } else {
           // 環境変数が設定されていない場合、Dockerコンテナ内で実行されている可能性を考慮
           // host.docker.internalを使用（WSL2環境ではextra_hostsで設定済み）
@@ -278,7 +282,7 @@ export class ApiClient {
         }
       } else {
         // サーバーサイドでは、環境変数から取得
-        browserBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://fastapi:8000';
+        browserBase = staticEnvBase || 'http://fastapi:8000';
       }
     }
     

@@ -69,6 +69,13 @@
   - `server_default`を適切に設定（特に`created_at`、`updated_at`など）
   - `NOT NULL`制約があるカラムには必ずデフォルト値を設定
   - モデル定義とマイグレーションの差分を`alembic check`で定期的に確認
+- **データベース接続文字列の扱い**:
+  - `asyncpg`（非同期）と`psycopg2`（同期）でSSLパラメータの形式が異なる
+  - `asyncpg`: `ssl=true`を使用（`sslmode`パラメータは理解しない）
+  - `psycopg2`: `sslmode=require`を使用（`ssl=true`は理解しない）
+  - `create_async_engine`では、URLクエリパラメータの`ssl=true`を`connect_args`の`ssl=True`に明示的に設定することを推奨
+  - URLから`sslmode`、`channel_binding`パラメータを削除し、`connect_args`でSSL設定を管理
+  - 環境変数は`ASYNC_DATABASE_URL`（FastAPI用）と`DATABASE_URL_SYNC`（Alembic用）を分離
 
 ## セキュリティ要件
 - 認証：JWT + OAuth2
@@ -98,6 +105,11 @@
 - メトリクス：Prometheus形式
 - アラート：閾値設定
 - トレーシング：OpenTelemetry
+- **デバッグ出力の扱い**:
+  - 本番環境では`print`文を使用したデバッグ出力を避ける
+  - デバッグ情報は`logging.debug()`または`logging.info()`を使用
+  - 一時的なデバッグ出力は本番デプロイ前に削除するか、環境変数で制御
+  - ログ初期化前に出力が必要な場合は`print`を使用し、`flush=True`を指定
 
 ## デプロイ・運用
 - コンテナ化：Docker
@@ -116,6 +128,11 @@
   - `railway login --token`は無効なコマンド（使用禁止）
   - 環境変数`RAILWAY_TOKEN`を設定して認証（`railway login`コマンドは不要）
   - `RAILWAY_PROJECT_ID`と`RAILWAY_TOKEN`は環境変数として設定
+  - **Dockerfile設定**:
+    - `Dockerfile Path`: ビルドコンテキストが`api`ディレクトリの場合は`Dockerfile`（`api/Dockerfile`ではない）
+    - `Build Context`: プロジェクトルートから見た`api`ディレクトリを指定
+    - `Watch Paths`: `/ai_chatbot_app/**`のような古いパスではなく、`api/**`などの実際のパスを設定
+    - `railway.json`で`dockerfilePath`と`watchPatterns`を明示的に定義することを推奨
 - **環境変数管理**:
   - 認証情報は必ずGitHub Secretsに保存
   - 環境ごとに別々のSecretsを設定（`DEMO_*`, `PROD_*`など）
@@ -137,12 +154,18 @@
 - 直接的なSQLクエリ（ORM使用）
 - 同期処理での長時間処理
 - 例外の握りつぶし
-- デバッグ用のprint文
+- デバッグ用のprint文（本番環境では削除またはログレベル調整）
+- **データベース接続関連の禁止事項**:
+  - `asyncpg`で`sslmode`パラメータを使用（`ssl=true`を使用）
+  - `psycopg2`で`ssl=true`パラメータを使用（`sslmode=require`を使用）
+  - URLクエリパラメータに`sslmode`と`ssl`を同時に含める
+  - `create_async_engine`の`connect_args`でSSL設定を省略（URLパラメータのみに依存）
 - **CI/CD関連の禁止事項**:
   - `railway login --token`コマンドの使用（無効なコマンド）
   - Vercelデプロイ時の`cd frontend`と`--cwd`オプションの併用（パス重複の原因）
   - 環境変数のハードコーディング（GitHub Secretsを使用）
   - 書き込み権限を前提としたファイルパス設定（フォールバック処理なし）
+  - Railwayの`Dockerfile Path`と`Build Context`の不一致（`api/Dockerfile`と`api`ディレクトリの組み合わせなど）
 
 ## 推奨事項
 - 型安全性の重視
@@ -151,6 +174,15 @@
 - テストの自動化
 - コードレビューの実施
 - リファクタリングの継続
+- **データベース接続の推奨事項**:
+  - `create_async_engine`では`connect_args`に`ssl=True`を明示的に設定
+  - URLからSSL関連パラメータ（`ssl`, `sslmode`, `channel_binding`）を削除し、`connect_args`で管理
+  - 環境変数`ASYNC_DATABASE_URL`と`DATABASE_URL_SYNC`を分離して設定
+  - URL正規化関数を実装し、`sslmode`を`ssl`に変換する処理を含める
+- **デプロイ設定の推奨事項**:
+  - Railwayの`railway.json`で`dockerfilePath`と`watchPatterns`を明示的に定義
+  - Dockerfileの`COPY`コマンドはビルドコンテキストを考慮したパスを使用
+  - デプロイ前にデバッグ出力を削除またはログレベルに変更
 
 ## 命名規則
 - ファイル名：snake_case (Python), kebab-case (TypeScript)
