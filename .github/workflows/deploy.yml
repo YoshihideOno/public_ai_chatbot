@@ -176,7 +176,6 @@ jobs:
       - name: Deploy Backend to Railway
         if: ${{ github.event.inputs.deploy_backend == 'true' }}
         run: |
-          cd api
           npm install -g @railway/cli
           railway up --service ${{ secrets.RAILWAY_DEMO_SERVICE }} --detach
         env:
