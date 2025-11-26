@@ -2,13 +2,13 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "api/Dockerfile",
+    "dockerfilePath": "Dockerfile",
     "watchPatterns": [
-      "api/**/*.py",
-      "api/**/*.txt",
-      "api/Dockerfile",
-      "api/alembic/**",
-      "api/requirements.txt"
+      "**/*.py",
+      "**/*.txt",
+      "**/Dockerfile",
+      "**/alembic/**",
+      "**/requirements.txt"
     ]
   },
   "deploy": {

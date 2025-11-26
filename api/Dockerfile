@@ -12,15 +12,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-# ビルドコンテキストがプロジェクトルートの場合
-COPY api/requirements.txt ./requirements.txt
+COPY requirements.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-# ビルドコンテキストがプロジェクトルートの場合
-COPY api/ .
+COPY . .
 
 # Expose port
 EXPOSE 8000
