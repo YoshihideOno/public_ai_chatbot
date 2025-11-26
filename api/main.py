@@ -29,6 +29,10 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # ログシステムの初期化（最優先）
+    from app.utils.logging import setup_logging
+    setup_logging()
+    
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
@@ -52,7 +56,8 @@ def create_app() -> FastAPI:
     logger.info(f"Parsed CORS origins: {cors_origins}")
     
     # 許可されたオリジンのリストを取得
-    allowed_origins = cors_origins if not settings.DEBUG else [
+    # DEBUG=true の場合でも、環境変数で設定されたオリジンを含める
+    dev_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
@@ -60,6 +65,14 @@ def create_app() -> FastAPI:
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     ]
+    
+    if settings.DEBUG:
+        # DEBUG=trueの場合、環境変数のオリジンとローカルオリジンを結合
+        allowed_origins = list(set(cors_origins + dev_origins))
+    else:
+        # DEBUG=falseの場合、環境変数のオリジンのみ使用
+        allowed_origins = cors_origins
+    
     print(f"[CORS CONFIG] Allowed origins: {allowed_origins}")
 
     # CORSヘッダーをすべてのリクエストに追加するミドルウェア
@@ -98,7 +111,7 @@ def create_app() -> FastAPI:
             response.headers["Access-Control-Allow-Credentials"] = "true"
         
         return response
-    
+
     # リクエストボディをログに記録するミドルウェア
     @app.middleware("http")
     async def log_request_body(request: Request, call_next):
@@ -121,9 +134,9 @@ def create_app() -> FastAPI:
     # このCORSミドルウェアは補助的な役割を果たします
     
     if settings.DEBUG:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=[
+        # DEBUG=trueの場合、環境変数のオリジンとローカルオリジンを結合
+        debug_origins = list(set(
+            settings.get_cors_origins() + [
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
                 "http://localhost:3001",
@@ -131,7 +144,13 @@ def create_app() -> FastAPI:
                 "http://localhost:8080",
                 "http://127.0.0.1:8080",
                 "null",  # file://プロトコル用
-            ],
+            ]
+        ))
+        logger.info(f"DEBUG mode: Using combined CORS origins: {debug_origins}")
+        
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=debug_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             allow_headers=[

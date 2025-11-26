@@ -134,6 +134,7 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    LOG_LEVEL: str = "INFO"
     
     # Timezone
     TIMEZONE: str = "Asia/Tokyo"

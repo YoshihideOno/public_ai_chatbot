@@ -16,11 +16,16 @@ class StructuredLogger:
     
     def __init__(self, name: str = "rag_chatbot"):
         self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
+        
+        # 環境変数からログレベルを取得
+        from app.core.config import settings
+        log_level_str = getattr(settings, 'LOG_LEVEL', 'INFO').upper()
+        log_level = getattr(logging, log_level_str, logging.INFO)
+        self.logger.setLevel(log_level)
         
         # コンソールハンドラー
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(log_level)
         
         # フォーマッター
         formatter = logging.Formatter(
@@ -824,9 +829,15 @@ class MonitoringUtils:
 # ログ設定の初期化
 def setup_logging():
     """ログ設定の初期化"""
+    from app.core.config import settings
+    
+    # 環境変数からログレベルを取得
+    log_level_str = getattr(settings, 'LOG_LEVEL', 'INFO').upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+    
     # ルートロガーの設定
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(log_level)
     
     # 既存のハンドラーをクリア
     for handler in root_logger.handlers[:]:
@@ -834,7 +845,7 @@ def setup_logging():
     
     # コンソールハンドラー
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(log_level)
     
     # フォーマッター
     formatter = logging.Formatter(
@@ -849,4 +860,4 @@ def setup_logging():
     logging.getLogger("fastapi").setLevel(logging.INFO)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     
-    logger.info("Logging system initialized")
+    logger.info(f"Logging system initialized with level: {log_level_str}")

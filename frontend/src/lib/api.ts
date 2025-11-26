@@ -266,7 +266,7 @@ export class ApiClient {
             };
           };
         }).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_BASE_URL;
-
+        
         if (runtimeEnvBase) {
           browserBase = runtimeEnvBase;
         } else if (staticEnvBase) {

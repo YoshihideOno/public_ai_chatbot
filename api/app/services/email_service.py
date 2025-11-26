@@ -178,6 +178,9 @@ class EmailService:
         # 本番環境ではResend APIを使用
         if not settings.RESEND_API_KEY or resend is None:
             logger.warning("Resend未設定のためメール送信をスキップ")
+            logger.debug(f"RESEND_API_KEY設定状況: {'設定あり' if settings.RESEND_API_KEY else '未設定'}")
+            logger.debug(f"EMAIL_FROM_ADDRESS: {settings.EMAIL_FROM_ADDRESS}")
+            logger.debug(f"resendモジュール: {'インポート成功' if resend else 'インポート失敗'}")
             return False
         
         try:
@@ -187,6 +190,10 @@ class EmailService:
                 "subject": subject,
                 "html": html,
             }
+            
+            # デバッグログ（LOG_LEVEL=debugの場合のみ出力）
+            logger.debug(f"メール送信開始 - to: {to_email}, from: {settings.EMAIL_FROM_ADDRESS}")
+            logger.debug(f"確認URL: {confirmation_url}")
             
             # 非同期でメール送信を実行（タイムアウト設定付き）
             import asyncio
@@ -199,15 +206,25 @@ class EmailService:
                 timeout=30.0  # 30秒のタイムアウト
             )
             
+            logger.debug(f"Resend API Response: {response}")
+            
             if response and hasattr(response, 'id'):
-                BusinessLogger.info(f"ユーザー登録確認メール送信完了: {response.id}")
+                logger.info(f"ユーザー登録確認メール送信完了: {response.id}")
                 return True
             else:
                 logger.error("ユーザー登録確認メール送信レスポンスが無効です")
+                logger.debug(f"Invalid response: {response}")
                 return False
                 
+        except asyncio.TimeoutError:
+            logger.error(f"ユーザー登録確認メール送信タイムアウト（30秒）")
+            return False
         except Exception as e:
             logger.error(f"ユーザー登録確認メール送信失敗: {str(e)}")
+            logger.debug(f"Exception type: {type(e).__name__}")
+            logger.debug(f"Exception details: {repr(e)}")
+            import traceback
+            logger.debug(f"Traceback:\n{traceback.format_exc()}")
             return False
 
     @staticmethod
