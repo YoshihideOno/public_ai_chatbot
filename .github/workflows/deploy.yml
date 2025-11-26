@@ -177,6 +177,8 @@ jobs:
         if: ${{ github.event.inputs.deploy_backend == 'true' }}
         run: |
           npm install -g @railway/cli
+          echo "Deploying to Railway..."
+          railway whoami || echo "Authentication check failed"
           railway up --service ${{ secrets.RAILWAY_DEMO_SERVICE }} --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
