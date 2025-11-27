@@ -33,7 +33,7 @@
 
 ## 注意事項
 
-- ウィジェットのCDN URL（`https://cdn.rag-chatbot.com/widget.js`）は、実際の本番環境のURLに置き換えてください。
-- 開発環境では、ローカルのウィジェットファイルを参照するように変更してください。
+- ウィジェットのCDN URL（`NEXT_PUBLIC_WIDGET_CDN_URL` に設定したURL）を利用してください。デフォルトは `https://cdn.rag-chatbot.com/widget.js` です。
+- 開発環境でローカルビルドを使用する場合は、スクリプトURLを `http://localhost:3001/widget.js` に差し替えてください。
 - テナントIDとAPIキーは機密情報のため、適切に管理してください。
 

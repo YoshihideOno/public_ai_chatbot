@@ -76,12 +76,23 @@ export function ChatWidget({
 
   // ウィジェットのURLを決定（開発環境と本番環境で切り替え）
   const getWidgetUrl = () => {
+    const envCdnUrl = process.env.NEXT_PUBLIC_WIDGET_CDN_URL?.trim();
+
+    if (envCdnUrl) {
+      return envCdnUrl;
+    }
+
     // 開発環境ではローカルのウィジェットを参照
     if (process.env.NODE_ENV === 'development') {
       // 開発サーバーが別ポートで動いている場合
+      if (!process.env.NEXT_PUBLIC_WIDGET_URL) {
+        console.warn('チャットウィジェット: NEXT_PUBLIC_WIDGET_CDN_URL が未設定のため http://localhost:3001/widget.js を参照します');
+      }
       return process.env.NEXT_PUBLIC_WIDGET_URL || 'http://localhost:3001/widget.js';
     }
-    // 本番環境ではCDNを参照
+
+    // フォールバック: 既定のCDNエンドポイント
+    console.warn('チャットウィジェット: NEXT_PUBLIC_WIDGET_CDN_URL が未設定のため既定のCDN URLを使用します');
     return 'https://cdn.rag-chatbot.com/widget.js';
   };
 

@@ -66,6 +66,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   
   const { user: currentUser } = useAuth();
   const router = useRouter();
+  const widgetScriptUrl = process.env.NEXT_PUBLIC_WIDGET_CDN_URL || 'https://cdn.rag-chatbot.com/widget.js';
 
   const isViewMode = mode === 'view';
   const isCreateMode = mode === 'create';
@@ -537,7 +538,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
     w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
     js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
     js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
-  }(window,document,'script','ragChat','https://cdn.rag-chatbot.com/widget.js'));
+  }(window,document,'script','ragChat','${widgetScriptUrl}'));
   
   ragChat('init', {
     tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
@@ -559,7 +560,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
     w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
     js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
     js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
-  }(window,document,'script','ragChat','https://cdn.rag-chatbot.com/widget.js'));
+  }(window,document,'script','ragChat','${widgetScriptUrl}'));
   
   ragChat('init', {
     tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
