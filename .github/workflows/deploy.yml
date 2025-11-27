@@ -179,8 +179,7 @@ jobs:
           cd packages/widget
           npm ci
           npm run build
-          vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_DEMO_TOKEN }} \
-            --scope ${{ secrets.VERCEL_WIDGET_DEMO_SCOPE }}
+          vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_DEMO_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_DEMO_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_DEMO_PROJECT_ID }}
@@ -263,8 +262,7 @@ jobs:
           cd packages/widget
           npm ci
           npm run build
-          vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_PROD_TOKEN }} \
-            --scope ${{ secrets.VERCEL_WIDGET_PROD_SCOPE }}
+          vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_PROD_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_PROD_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROD_PROJECT_ID }}
@@ -348,8 +346,7 @@ jobs:
           cd packages/widget
           npm ci
           npm run build
-          vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_PROD_TOKEN }} \
-            --scope ${{ secrets.VERCEL_WIDGET_PROD_SCOPE }}
+          vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_PROD_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_PROD_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROD_PROJECT_ID }}
