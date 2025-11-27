@@ -179,6 +179,8 @@ jobs:
           cd packages/widget
           npm ci
           npm run build
+          # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
+          rm -rf .vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_DEMO_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_DEMO_ORG_ID }}
@@ -262,6 +264,8 @@ jobs:
           cd packages/widget
           npm ci
           npm run build
+          # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
+          rm -rf .vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_PROD_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_PROD_ORG_ID }}
@@ -346,6 +350,8 @@ jobs:
           cd packages/widget
           npm ci
           npm run build
+          # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
+          rm -rf .vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_WIDGET_PROD_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_PROD_ORG_ID }}
