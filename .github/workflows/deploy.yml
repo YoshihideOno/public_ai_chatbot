@@ -193,6 +193,12 @@ jobs:
           npm install -g @railway/cli
           cd api
           echo "=== Railway Deployment ==="
+          echo "Environment variables check:"
+          echo "RAILWAY_TOKEN length: ${#RAILWAY_TOKEN}"
+          echo "RAILWAY_TOKEN first 5 chars: ${RAILWAY_TOKEN:0:5}"
+          echo "RAILWAY_PROJECT_ID: ${RAILWAY_PROJECT_ID}"
+          echo "RAILWAY_SERVICE: ${RAILWAY_SERVICE}"
+          echo "---"
           echo "Checking authentication..."
           railway whoami
           echo "Deploying to Railway..."
