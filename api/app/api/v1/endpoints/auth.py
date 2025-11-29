@@ -13,7 +13,7 @@
 - OAuth2認証
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -147,7 +147,7 @@ async def register(
 
 @router.post("/verify-email")
 async def verify_email(
-    verification_data: EmailVerification,
+    token: str = Query(..., description="確認トークン"),
     request: Request = None,
     db: AsyncSession = Depends(get_db)
 ):
@@ -158,7 +158,7 @@ async def verify_email(
     トークンが有効な場合、ユーザーのis_verifiedフラグをtrueに設定します。
     
     引数:
-        token: 確認トークン
+        token: 確認トークン（クエリパラメータ）
         request: FastAPIのRequestオブジェクト
         db: データベースセッション
         
@@ -170,7 +170,7 @@ async def verify_email(
     """
     try:
         # トークンを検証
-        user = await TokenService.verify_token(db, verification_data.token, "email_verification")
+        user = await TokenService.verify_token(db, token, "email_verification")
         
         if not user:
             raise HTTPException(
@@ -202,7 +202,7 @@ async def verify_email(
     except HTTPException:
         raise
     except Exception as e:
-        ErrorLogger.log_exception(e, {"operation": "verify_email", "token": verification_data.token})
+        ErrorLogger.log_exception(e, {"operation": "verify_email", "token": token})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="メール確認処理に失敗しました"

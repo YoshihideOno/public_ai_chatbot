@@ -208,8 +208,11 @@ class EmailService:
             
             logger.debug(f"Resend API Response: {response}")
             
-            if response and hasattr(response, 'id'):
-                logger.info(f"ユーザー登録確認メール送信完了: {response.id}")
+            # レスポンスの検証を緩和（Resend APIは成功時に様々な形式を返す可能性がある）
+            if response:
+                # response.id がある場合はそれを使用、なければ response 自体をログ
+                response_id = getattr(response, 'id', None) or str(response)
+                logger.info(f"ユーザー登録確認メール送信完了: {response_id}")
                 return True
             else:
                 logger.error("ユーザー登録確認メール送信レスポンスが無効です")
