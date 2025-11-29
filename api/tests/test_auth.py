@@ -502,10 +502,9 @@ async def test_verify_email(mock_send_email: AsyncMock, client: TestClient, db_s
             token_type="email_verification"
         )
 
-        # 正常系テストケース1: 有効な検証トークンでメールアドレス検証
+        # 正常系テストケース1: 有効な検証トークンでメールアドレス検証（クエリパラメータで送信）
         response = client.post(
-            f"{settings.API_V1_STR}/auth/verify-email",
-            json={"token": verification_token}
+            f"{settings.API_V1_STR}/auth/verify-email?token={verification_token}"
         )
         assert response.status_code == 200
         response_data = response.json()
@@ -522,10 +521,9 @@ async def test_verify_email(mock_send_email: AsyncMock, client: TestClient, db_s
         await db_session.refresh(user_after_verify)
         assert user_after_verify.is_verified, f"メール検証が完了していません: is_verified={user_after_verify.is_verified}"
 
-        # 異常系テストケース1: 無効な検証トークン
+        # 異常系テストケース1: 無効な検証トークン（クエリパラメータで送信）
         response = client.post(
-            f"{settings.API_V1_STR}/auth/verify-email",
-            json={"token": "invalidverificationtoken"}
+            f"{settings.API_V1_STR}/auth/verify-email?token=invalidverificationtoken"
         )
         assert response.status_code == 400
         # エラーメッセージは日本語・英語両方に対応
@@ -533,7 +531,7 @@ async def test_verify_email(mock_send_email: AsyncMock, client: TestClient, db_s
         assert ("Invalid" in detail or "expired" in detail.lower() or "token" in detail.lower() or
                 "無効" in detail or "期限切れ" in detail or "トークン" in detail)
 
-        # 異常系テストケース2: トークンなし
+        # 異常系テストケース2: トークンなし（クエリパラメータが必須のため422エラー）
         response = client.post(
             f"{settings.API_V1_STR}/auth/verify-email"
         )
