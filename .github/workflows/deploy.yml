@@ -199,10 +199,8 @@ jobs:
           echo "RAILWAY_PROJECT_ID: ${RAILWAY_PROJECT_ID}"
           echo "RAILWAY_SERVICE: ${RAILWAY_SERVICE}"
           echo "---"
-          echo "Checking authentication..."
-          railway whoami
           echo "Deploying to Railway..."
-          railway up --service "$RAILWAY_SERVICE" --detach
+          railway up --project "$RAILWAY_PROJECT_ID" --service "$RAILWAY_SERVICE" --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_DEMO_PROJECT_ID }}
