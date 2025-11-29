@@ -191,7 +191,6 @@ jobs:
         if: ${{ github.event.inputs.deploy_backend == 'true' }}
         run: |
           npm install -g @railway/cli
-          cd api
           echo "=== Railway Deployment ==="
           echo "Environment variables check:"
           echo "RAILWAY_TOKEN length: ${#RAILWAY_TOKEN}"
@@ -200,7 +199,7 @@ jobs:
           echo "RAILWAY_SERVICE: ${RAILWAY_SERVICE}"
           echo "---"
           echo "Deploying to Railway..."
-          railway up --project "$RAILWAY_PROJECT_ID" --service "$RAILWAY_SERVICE" --detach
+          railway up --service "$RAILWAY_SERVICE" --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_DEMO_PROJECT_ID }}
