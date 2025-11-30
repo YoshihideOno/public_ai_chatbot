@@ -140,7 +140,8 @@ cp env.example .env.local
 | `OPENAI_API_KEY` | OpenAI APIキー（任意） | `sk-...` |
 | `ANTHROPIC_API_KEY` | Anthropic APIキー（任意） | `...` |
 | `NEXT_PUBLIC_APP_NAME` | フロントエンドのアプリ名 | `AI Chatbot` |
-| `FASTAPI_BASE_URL` | FastAPIのベースURL | `http://localhost:8000` |
+| `NEXT_PUBLIC_API_BASE_URL` | フロントエンドのAPIベースURL | `http://localhost:8000` |
+| `NEXT_PUBLIC_API_URL` | 埋め込みコード生成用API URL | `http://localhost:8000/api/v1` |
 | `STORAGE_LOCAL_PATH` | ローカルストレージパス（未設定時は `/tmp/rag_storage`） | `/tmp/rag_storage` |
 
 3. フロントエンド用の環境変数（`frontend/.env.local`）も必要に応じて設定
