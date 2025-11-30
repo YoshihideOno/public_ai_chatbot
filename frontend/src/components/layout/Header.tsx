@@ -222,7 +222,7 @@ export function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
                   <DropdownMenuItem asChild>
                     <Link href="/settings" className="flex items-center">
                       <Settings className="mr-2 h-4 w-4" />
-                      <span>設定</span>
+                      <span>テナント設定</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

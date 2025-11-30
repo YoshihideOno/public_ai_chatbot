@@ -104,9 +104,12 @@ function DashboardContent() {
       if (window.location.origin === 'http://localhost:3000') {
         return 'http://localhost:8000/api/v1';
       }
+      // 本番環境では、現在のオリジンからAPI URLを構築
+      // APIが別ドメインにある場合は環境変数で設定する必要がある
+      return `${window.location.origin}/api/v1`;
     }
-    // 本番環境では相対パスを使用
-    return '/api/v1';
+    // サーバーサイドでは環境変数から取得、なければ相対パス
+    return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
   }, []);
 
   /**

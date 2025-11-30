@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -67,6 +67,25 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   const { user: currentUser } = useAuth();
   const router = useRouter();
   const widgetScriptUrl = process.env.NEXT_PUBLIC_WIDGET_CDN_URL || 'https://cdn.rag-chatbot.com/widget.js';
+  
+  // APIベースURLを計算（クライアントサイド）
+  const apiBaseUrl = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      // 環境変数から取得（ビルド時に注入される）
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+      }
+      // 開発環境ではローカルのAPIサーバーを参照
+      if (window.location.origin === 'http://localhost:3000') {
+        return 'http://localhost:8000/api/v1';
+      }
+      // 本番環境では、現在のオリジンからAPI URLを構築
+      // APIが別ドメインにある場合は環境変数で設定する必要がある
+      return `${window.location.origin}/api/v1`;
+    }
+    // サーバーサイドでは環境変数から取得、なければ相対パス
+    return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  }, []);
 
   const isViewMode = mode === 'view';
   const isCreateMode = mode === 'create';
@@ -543,6 +562,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   ragChat('init', {
     tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
     apiKey: '${apiKey ? `${apiKey.slice(0, 20)}...` : 'YOUR_API_KEY'}',
+    apiBaseUrl: '${apiBaseUrl}',
     theme: 'light',
     position: 'bottom-right'
   });
@@ -565,6 +585,7 @@ export function TenantForm({ tenantId, mode }: TenantFormProps) {
   ragChat('init', {
     tenantId: '${tenantId || 'YOUR_TENANT_ID'}',
     apiKey: '${apiKey || 'YOUR_API_KEY'}',
+    apiBaseUrl: '${apiBaseUrl}',
     theme: 'light',
     position: 'bottom-right'
   });

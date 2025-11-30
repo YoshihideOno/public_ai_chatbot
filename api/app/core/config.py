@@ -131,6 +131,10 @@ class Settings(BaseSettings):
     
     APP_URL: Optional[str] = None
     
+    # Widget/CDN Settings
+    WIDGET_CDN_URL: Optional[str] = None  # ウィジェットスクリプトのCDN URL
+    API_BASE_URL: Optional[str] = None  # 埋め込みコードで使用するAPIベースURL
+    
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -204,6 +208,12 @@ class Settings(BaseSettings):
                     raise ValueError("STRIPE_WEBHOOK_SECRETが設定されていません")
                 if not self.APP_URL:
                     raise ValueError("APP_URLが設定されていません")
+                
+                # ウィジェット設定のチェック（警告のみ）
+                if not self.WIDGET_CDN_URL:
+                    logging.warning("WIDGET_CDN_URLが設定されていません。埋め込みコード生成時にデフォルト値が使用されます。")
+                if not self.API_BASE_URL and not self.APP_URL:
+                    logging.warning("API_BASE_URLまたはAPP_URLが設定されていません。埋め込みコード生成時に相対パスが使用されます。")
             
             logging.info(f"設定バリデーション完了: {self.ENVIRONMENT}環境")
             return True

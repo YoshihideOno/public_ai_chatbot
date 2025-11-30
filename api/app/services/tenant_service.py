@@ -404,6 +404,7 @@ class TenantService:
     async def generate_embed_snippet(self, tenant_id: str) -> Optional[TenantEmbedSnippet]:
         """埋め込みスニペット生成"""
         from app.utils.logging import logger
+        from app.core.config import settings
         
         tenant = await self.get_by_id(tenant_id)
         if not tenant:
@@ -424,17 +425,32 @@ class TenantService:
                 logger.error(f"APIキー生成後のテナント取得に失敗: tenant_id={tenant_id}")
                 return None
         
+        # ウィジェットCDN URLを取得（環境変数から、なければデフォルト値）
+        widget_cdn_url = settings.WIDGET_CDN_URL or 'https://cdn.rag-chatbot.com/widget.js'
+        
+        # APIベースURLを取得（環境変数から、なければAPP_URLから構築）
+        if settings.API_BASE_URL:
+            api_base_url = settings.API_BASE_URL
+        elif settings.APP_URL:
+            # APP_URLからAPIベースURLを構築
+            api_base_url = f"{settings.APP_URL.rstrip('/')}/api/v1"
+        else:
+            # フォールバック: 相対パスを使用
+            api_base_url = '/api/v1'
+            logger.warning("WIDGET_CDN_URLとAPP_URLが設定されていないため、相対パスを使用します")
+        
         snippet = f"""
 <script>
   (function(w,d,s,o,f,js,fjs){{
     w['RAGChatWidget']=o;w[o]=w[o]||function(){{(w[o].q=w[o].q||[]).push(arguments)}};
     js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
     js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
-  }}(window,document,'script','ragChat','https://cdn.rag-chatbot.com/widget.js'));
+  }}(window,document,'script','ragChat','{widget_cdn_url}'));
   
   ragChat('init', {{
     tenantId: '{tenant.id}',
     apiKey: '{tenant.api_key}',
+    apiBaseUrl: '{api_base_url}',
     theme: 'light',
     position: 'bottom-right'
   }});

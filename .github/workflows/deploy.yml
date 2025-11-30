@@ -161,6 +161,9 @@ jobs:
       - uses: actions/checkout@v4
       
       # フロントエンド: Vercelデプロイ
+      # 注意: Vercel Dashboardで以下の環境変数を設定してください
+      # NEXT_PUBLIC_WIDGET_CDN_URL: ウィジェットCDN URL
+      # NEXT_PUBLIC_API_URL: APIベースURL（NEXT_PUBLIC_API_BASE_URLとは別に設定）
       - name: Deploy Frontend to Vercel (Demo)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
@@ -249,6 +252,9 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       
       # フロントエンド: Vercelデプロイ（本番環境）
+      # 注意: Vercel Dashboardで以下の環境変数を設定してください
+      # NEXT_PUBLIC_WIDGET_CDN_URL: ウィジェットCDN URL
+      # NEXT_PUBLIC_API_URL: APIベースURL（NEXT_PUBLIC_API_BASE_URLとは別に設定）
       - name: Deploy Frontend to Vercel (Production)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |

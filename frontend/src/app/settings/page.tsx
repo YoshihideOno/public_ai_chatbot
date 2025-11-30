@@ -1,9 +1,9 @@
 /**
- * アカウント設定ページ
+ * テナント設定ページ
  * 
- * ログインユーザーのプロフィール情報やパスワード変更など、
- * アカウントに関する設定を行うためのページコンポーネント。
- * 現時点では基本情報の表示のみを提供し、今後機能拡張予定。
+ * ログインユーザーのプロフィール情報やテナント設定など、
+ * テナントに関する設定を行うためのページコンポーネント。
+ * テナント管理者はテナントの各種設定を管理できます。
  */
 
 'use client';
@@ -46,8 +46,8 @@ export default function SettingsPage() {
     <ProtectedRoute>
       <div className="container mx-auto py-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">アカウント設定</h1>
-          <p className="text-muted-foreground mt-2">プロフィール情報の確認と管理を行います。</p>
+          <h1 className="text-3xl font-bold">テナント設定</h1>
+          <p className="text-muted-foreground mt-2">テナントの設定情報の確認と管理を行います。</p>
         </div>
 
         <Card>
