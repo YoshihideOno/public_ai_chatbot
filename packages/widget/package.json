@@ -12,14 +12,12 @@
     "dev": "rollup -c -w",
     "serve": "node server.js",
     "start": "npm run build && npm run serve",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build",
   },
   "dependencies": {
     "preact": "^10.17.1",
     "htm": "^3.1.1",
-    "nanoid": "^5.0.0"
-  },
-  "devDependencies": {
+    "nanoid": "^5.0.0",
     "rollup": "^3.29.0",
     "@rollup/plugin-node-resolve": "^15.3.0",
     "@rollup/plugin-commonjs": "^25.0.8",
@@ -27,7 +25,8 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@babel/core": "^7.24.0",
     "@babel/preset-env": "^7.24.0"
-  }
+  },
+  "devDependencies": {}
 }
 
 

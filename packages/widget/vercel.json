@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".",
+  "installCommand": "npm ci || npm install",
   "framework": null,
   "headers": [
     {
