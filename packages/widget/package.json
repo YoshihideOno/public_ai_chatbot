@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "serve": "node server.js",
-    "start": "npm run build && npm run serve"
+    "start": "npm run build && npm run serve",
+    "vercel-build": "npm run build"
   },
   "dependencies": {
     "preact": "^10.17.1",
