@@ -24,6 +24,7 @@ router = APIRouter()
 @router.get("/recent")
 async def get_recent_audit_logs(
     limit: int = Query(10, ge=1, le=50),
+    skip_audit: bool = Query(False, description="監査ログ記録をスキップするかどうか（自動ポーリング時はtrue）"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -32,6 +33,9 @@ async def get_recent_audit_logs(
     - 認証必須
     - テナント分離: PLATFORM_ADMIN は全件、それ以外は自テナントのみ
     - limit: 1〜50
+    - skip_audit: 監査ログ記録をスキップするかどうか（デフォルト: false）
+      - true: 自動ポーリング時など、監査ログ記録をスキップ
+      - false: 初回取得時など、監査ログ記録を実行
     """
 
     stmt = select(
@@ -57,13 +61,14 @@ async def get_recent_audit_logs(
     result = await db.execute(stmt)
     rows = result.all()
 
-    # 監査: 取得イベントを記録
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_recent_audit_logs",
-        "audit_logs",
-        tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None
-    )
+    # 監査: 取得イベントを記録（skip_auditがFalseの場合のみ）
+    if not skip_audit:
+        BusinessLogger.log_user_action(
+            str(current_user.id),
+            "get_recent_audit_logs",
+            "audit_logs",
+            tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None
+        )
 
     # JSON化
     activities = []

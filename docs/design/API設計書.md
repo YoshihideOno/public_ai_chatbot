@@ -366,6 +366,47 @@ X-API-Key: <tenant_api_key>
 }
 ```
 
+### 3.8 監査ログエンドポイント
+
+#### GET /api/v1/audit-logs/recent
+**説明**: 最近の監査ログを取得
+
+**認証**: 必須
+
+**クエリパラメータ**:
+- `limit` (int, optional): 取得件数（1-50、デフォルト: 10）
+- `skip_audit` (bool, optional): 監査ログ記録をスキップするかどうか（デフォルト: false）
+  - `true`: 自動ポーリング時など、監査ログ記録をスキップ
+  - `false`: 初回取得時など、監査ログ記録を実行
+
+**テナント分離**:
+- `PLATFORM_ADMIN`: 全テナントの監査ログを取得可能
+- その他のロール: 自テナントの監査ログのみ取得可能
+
+**レスポンス**: `200 OK`
+```json
+{
+  "activities": [
+    {
+      "id": "uuid",
+      "user_id": "uuid",
+      "tenant_id": "uuid",
+      "action": "string",
+      "resource_type": "string",
+      "resource_id": "uuid",
+      "ip_address": "string",
+      "user_agent": "string",
+      "details": {},
+      "created_at": "2025-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+**使用例**:
+- 初回取得（監査ログを記録）: `GET /api/v1/audit-logs/recent?limit=10`
+- 自動ポーリング（監査ログを記録しない）: `GET /api/v1/audit-logs/recent?limit=10&skip_audit=true`
+
 ---
 
 ## 4. エラーハンドリング

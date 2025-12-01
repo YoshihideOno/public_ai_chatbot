@@ -680,8 +680,12 @@ export class ApiClient {
     };
   }
 
-  async getRecentActivities(limit: number = 10): Promise<RecentActivity[]> {
-    const response = await this.client.get(`/audit-logs/recent?limit=${limit}`);
+  async getRecentActivities(limit: number = 10, skipAudit: boolean = false): Promise<RecentActivity[]> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (skipAudit) {
+      params.append('skip_audit', 'true');
+    }
+    const response = await this.client.get(`/audit-logs/recent?${params.toString()}`);
     return (response.data?.activities ?? []) as RecentActivity[];
   }
 }

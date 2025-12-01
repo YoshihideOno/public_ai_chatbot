@@ -287,18 +287,20 @@ function DashboardContent() {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     let isCancelled = false;
-    const fetchActivities = async () => {
+    const fetchActivities = async (skipAudit: boolean = false) => {
       try {
-        const items = await apiClient.getRecentActivities(10);
+        const items = await apiClient.getRecentActivities(10, skipAudit);
         if (!isCancelled) setActivities(items);
       } catch {
         // サイレント
       }
     };
-    // 初回
-    fetchActivities();
-    // 軽いポーリング（10秒）
-    timer = setInterval(fetchActivities, 10000);
+    // 初回（監査ログを記録）
+    fetchActivities(false);
+    // 軽いポーリング（10秒、監査ログを記録しない）
+    timer = setInterval(() => {
+      fetchActivities(true);
+    }, 10000);
     return () => {
       isCancelled = true;
       if (timer) clearInterval(timer);
