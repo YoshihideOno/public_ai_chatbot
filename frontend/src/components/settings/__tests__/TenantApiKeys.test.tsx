@@ -100,19 +100,23 @@ describe('TenantApiKeys', () => {
       }
     }, { timeout: 5000 })
     
-    // 登録ボタンを探してクリック（存在する場合）
-    const registerButton = screen.queryByRole('button', { name: /登録/i })
-    if (registerButton && !registerButton.hasAttribute('disabled')) {
-      await user.click(registerButton)
-      
-      // 作成関数が呼ばれたことを確認
-      await waitFor(() => {
-        expect(mockCreateApiKey).toHaveBeenCalled()
-      }, { timeout: 3000 })
-    } else {
-      // 登録ボタンが無効または存在しない場合、検証が成功したことを確認するだけ
-      expect(mockVerifyApiKeyInline).toHaveBeenCalled()
-    }
+    // 登録ボタンを探してクリック
+    const registerButton = await screen.findByRole('button', { name: /登録/i }, { timeout: 3000 })
+    await waitFor(() => {
+      expect(registerButton).not.toHaveAttribute('disabled')
+    }, { timeout: 5000 })
+
+    await user.click(registerButton)
+
+    // 作成関数が呼ばれたことを確認
+    await waitFor(() => {
+      expect(mockCreateApiKey).toHaveBeenCalled()
+    }, { timeout: 3000 })
+
+    // 登録後にフォームがクリアされていることを確認
+    await waitFor(() => {
+      expect((apiKeyInput as HTMLInputElement).value).toBe('')
+    }, { timeout: 3000 })
   }, 15000)
 
   test('APIキー削除', async () => {

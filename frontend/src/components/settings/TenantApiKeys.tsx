@@ -87,8 +87,7 @@ export function TenantApiKeys() {
       }
       logger.info('APIキー登録リクエスト', { provider: selectedProvider, model: selectedModel, api_key_length: plainApiKey.length });
       await apiClient.createApiKey({ provider: selectedProvider, model: selectedModel, api_key: plainApiKey });
-      setPlainApiKey('');
-      setVerifyOk(false);
+      resetFormFields();
       setSuccessMessage('APIキーを登録しました');
       setShowRegisterSuccessDialog(true);
       await load();
@@ -208,6 +207,25 @@ export function TenantApiKeys() {
     setVerifyOk(false);
   }, [selectedProvider, selectedModel, plainApiKey]);
 
+  /**
+   * APIキー登録フォームの入力値を初期状態にリセット
+   * 
+   * 成功時にプロバイダー・モデル・APIキー入力欄をすべてクリアするためのヘルパーです。
+   * プロバイダーは一覧の先頭、モデルはそのプロバイダーの先頭モデルを初期値とします。
+   */
+  const resetFormFields = () => {
+    if (providers.length > 0) {
+      const firstProvider = providers[0];
+      setSelectedProvider(firstProvider.provider);
+      setSelectedModel(firstProvider.models?.[0]);
+    } else {
+      setSelectedProvider(undefined);
+      setSelectedModel(undefined);
+    }
+    setPlainApiKey('');
+    setVerifyOk(false);
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -257,6 +275,10 @@ export function TenantApiKeys() {
           <CardTitle>APIキー登録</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            プロバイダーとモデルを選択しAPIキーを貼り付けたら「検証」ボタンをクリックしてAPIキーの有効性をチェックしてください。
+            有効性が確認できたら[登録]ボタンが有効になります。
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <div className="text-sm mb-2">プロバイダー</div>

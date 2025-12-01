@@ -237,10 +237,32 @@ async def upload_file(
             request=request,
             resource_id=str(content.id)
         )
+
+        # 非同期SQLAlchemyセッションとPydanticのfrom_ormの相互作用により
+        # MissingGreenletエラーが発生するのを避けるため、
+        # 一覧取得と同様に明示的に辞書へマッピングしてからスキーマに詰め替える
+        from app.schemas.content import Content as ContentSchema
+
+        content_payload = ContentSchema(
+            id=str(content.id),
+            tenant_id=str(content.tenant_id),
+            title=content.title,
+            content_type=content.file_type.value,
+            description=content.description,
+            tags=content.tags if content.tags else [],
+            metadata=content.metadata_json if getattr(content, "metadata_json", None) else {},
+            file_name=content.file_name,
+            file_size=content.size_bytes,
+            status=content.status.value if content.status else None,
+            uploaded_at=content.uploaded_at,
+            indexed_at=content.indexed_at,
+            created_at=content.created_at,
+            updated_at=content.updated_at,
+        )
         
         return {
             "message": "ファイルがアップロードされました",
-            "content": Content.from_orm(content)
+            "content": content_payload,
         }
         
     except ConflictError:
