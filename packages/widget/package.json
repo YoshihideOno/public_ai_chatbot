@@ -12,7 +12,7 @@
     "dev": "rollup -c -w",
     "serve": "node server.js",
     "start": "npm run build && npm run serve",
-    "vercel-build": "npm run build",
+    "vercel-build": "npm run build"
   },
   "dependencies": {
     "preact": "^10.17.1",
