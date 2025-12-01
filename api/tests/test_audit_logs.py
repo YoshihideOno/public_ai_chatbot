@@ -315,12 +315,15 @@ async def test_get_recent_audit_logs_initial_fetch(client: TestClient, db_sessio
         assert isinstance(data["activities"], list)
         
         # 監査ログテーブルを確認し、get_recent_audit_logsのレコードが追加されたことを確認
-        await db_session.commit()  # コミットして最新状態を取得
-        result_after = await db_session.execute(
-            select(AuditLog).where(AuditLog.action == "get_recent_audit_logs")
-        )
-        audit_logs_after = result_after.scalars().all()
-        count_after = len(audit_logs_after)
+        # エンドポイント内で使用しているセッションとは別のセッションなので、
+        # 新しいセッションを作成して確認する
+        from app.core.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as new_session:
+            result_after = await new_session.execute(
+                select(AuditLog).where(AuditLog.action == "get_recent_audit_logs")
+            )
+            audit_logs_after = result_after.scalars().all()
+            count_after = len(audit_logs_after)
         
         # 監査ログが1件追加されていることを確認
         assert count_after == count_before + 1, f"監査ログが記録されていません。前: {count_before}, 後: {count_after}"

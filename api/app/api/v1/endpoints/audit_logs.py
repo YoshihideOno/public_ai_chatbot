@@ -15,6 +15,7 @@ from app.schemas.user import User
 from app.api.v1.deps import get_current_user
 from app.models.user import UserRole
 from app.utils.logging import BusinessLogger
+from app.services.audit_log_service import AuditLogService
 
 from app.models.audit_log import AuditLog
 
@@ -63,12 +64,26 @@ async def get_recent_audit_logs(
 
     # 監査: 取得イベントを記録（skip_auditがFalseの場合のみ）
     if not skip_audit:
-        BusinessLogger.log_user_action(
-            str(current_user.id),
-            "get_recent_audit_logs",
-            "audit_logs",
-            tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None
-        )
+        # テスト環境でも動作するように、直接AuditLogServiceを使用
+        if current_user.tenant_id:
+            try:
+                audit_service = AuditLogService(db)
+                await audit_service.create_audit_log(
+                    tenant_id=str(current_user.tenant_id),
+                    action="get_recent_audit_logs",
+                    resource_type="audit_logs",
+                    user_id=str(current_user.id)
+                )
+            except Exception as e:
+                # 監査ログ記録の失敗はメイン処理に影響させない
+                # エラーはログに記録（BusinessLoggerは使用しない）
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"監査ログの記録に失敗: action=get_recent_audit_logs, "
+                    f"tenant_id={current_user.tenant_id}, error={str(e)}",
+                    exc_info=True
+                )
 
     # JSON化
     activities = []
