@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File as FastAPIFile, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File as FastAPIFile, Request, Form
 from fastapi.responses import StreamingResponse, Response
 from io import StringIO
 import csv
@@ -161,9 +161,9 @@ async def create_content(
 @router.post("/upload")
 async def upload_file(
     file: UploadFile = FastAPIFile(...),
-    title: Optional[str] = None,
-    description: Optional[str] = None,
-    tags: Optional[str] = None,
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
     request: Request = None,
     current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
