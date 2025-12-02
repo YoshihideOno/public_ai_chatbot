@@ -234,7 +234,10 @@ async def upload_file(
         content = await content_service.create_content(
             content_data=content_data,
             tenant_id=tenant_id,
-            user_id=str(current_user.id)
+            user_id=str(current_user.id),
+            # アップロード時の実ファイル名（例: ai_chatbot_manual.md）を渡して
+            # files.file_name および s3_key の基準とする
+            original_file_name=file.filename
         )
         
         BusinessLogger.log_user_action(

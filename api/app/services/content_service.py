@@ -179,7 +179,14 @@ class ContentService:
             logger.error(f"ファイル名重複チェックエラー: {str(e)}")
             raise
 
-    async def create_content(self, content_data: ContentCreate, tenant_id: str, user_id: str, idempotency_key: Optional[str] = None) -> File:
+    async def create_content(
+        self,
+        content_data: ContentCreate,
+        tenant_id: str,
+        user_id: str,
+        idempotency_key: Optional[str] = None,
+        original_file_name: Optional[str] = None,
+    ) -> File:
         """
         コンテンツ作成
         
@@ -221,12 +228,28 @@ class ContentService:
             logger.warning(f"Idempotencyキー照会でエラーが発生しました（処理は継続）: {str(e)}")
 
         # ファイル名の決定
-        if content_data.file_url:
+        # 優先順位:
+        # 1) original_file_name（アップロード時の実ファイル名）
+        # 2) file_url からの抽出
+        # 3) タイトル + 拡張子
+        if original_file_name:
+            # パスが含まれている場合はベース名のみを使用
+            base_name = original_file_name.split("/")[-1]
+            # 空になってしまった場合のフォールバック
+            if not base_name:
+                base_name = f"{content_data.title}.{content_data.content_type.value.lower()}"
+            # DB制約（String(500)）に合わせて500文字以内に制限
+            file_name = base_name[:500]
+        elif content_data.file_url:
             # URLからファイル名を抽出
             try:
                 from urllib.parse import urlparse
                 parsed_url = urlparse(content_data.file_url)
-                file_name = parsed_url.path.split('/')[-1] or f"{content_data.title}.{content_data.content_type.value.lower()}"
+                url_name = parsed_url.path.split('/')[-1]
+                if url_name:
+                    file_name = url_name[:500]
+                else:
+                    file_name = f"{content_data.title}.{content_data.content_type.value.lower()}"
             except Exception:
                 file_name = f"{content_data.title}.{content_data.content_type.value.lower()}"
         else:
