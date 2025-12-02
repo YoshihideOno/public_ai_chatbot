@@ -522,8 +522,25 @@ async def get_content_chunks(
         limit=limit
     )
     
+    # ORMモデルからスキーマへの明示的なマッピングを行う
+    # - Chunkモデルのchunk_text -> スキーマのcontent
+    # - metadata_json -> metadata
+    chunk_items: List[Chunk] = []
+    for ch in chunks:
+        chunk_items.append(
+            Chunk(
+                id=str(ch.id),
+                file_id=str(ch.file_id),
+                tenant_id=str(ch.tenant_id),
+                chunk_index=ch.chunk_index,
+                content=ch.chunk_text,
+                metadata=ch.metadata_json if getattr(ch, "metadata_json", None) else {},
+                created_at=ch.created_at,
+            )
+        )
+    
     # チャンク一覧取得は参照系GETのため、監査ログには記録しない
-    return chunks
+    return chunk_items
 
 
 @router.get("/actions/export")
