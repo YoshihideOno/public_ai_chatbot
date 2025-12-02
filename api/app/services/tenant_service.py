@@ -176,9 +176,12 @@ class TenantService:
                 # 既存の設定とマージ（部分更新）
                 current_settings.update(new_settings)
                 # None値のキーを削除
+                # ただし、default_modelとembedding_modelはNone値でも保持（未選択状態を明示的に保存）
                 for key in list(current_settings.keys()):
                     if current_settings[key] is None:
-                        del current_settings[key]
+                        # default_modelとembedding_modelはNone値でも保持
+                        if key not in ('default_model', 'embedding_model'):
+                            del current_settings[key]
                 tenant.settings = current_settings
         
         # その他のフィールドを更新
@@ -292,9 +295,12 @@ class TenantService:
         current_settings.update(updated_settings)
         
         # None値（未選択の場合）はキーを削除
+        # ただし、default_modelとembedding_modelはNone値でも保持（未選択状態を明示的に保存）
         for key in list(current_settings.keys()):
             if current_settings[key] is None:
-                del current_settings[key]
+                # default_modelとembedding_modelはNone値でも保持
+                if key not in ('default_model', 'embedding_model'):
+                    del current_settings[key]
         
         tenant.settings = current_settings
         tenant.updated_at = DateTimeUtils.now()
@@ -328,9 +334,12 @@ class TenantService:
         current_settings.update(settings)
         
         # None値（未選択の場合）はキーを削除
+        # ただし、default_modelとembedding_modelはNone値でも保持（未選択状態を明示的に保存）
         for key in list(current_settings.keys()):
             if current_settings[key] is None:
-                del current_settings[key]
+                # default_modelとembedding_modelはNone値でも保持
+                if key not in ('default_model', 'embedding_model'):
+                    del current_settings[key]
         
         # 新しい辞書オブジェクトとして割り当て（SQLAlchemyが変更を検知できるように）
         tenant.settings = current_settings

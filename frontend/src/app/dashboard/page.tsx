@@ -254,7 +254,8 @@ function DashboardContent() {
       const statusCounts: Record<string, number> = contentStats.status_counts ?? {};
       const indexedCount = statusCounts['INDEXED'] ?? 0;
       const hasIndexedContent = indexedCount >= 1;
-      const isReady = hasChatModel && hasEmbeddingModel && hasApiKey;
+      // チャットボット利用可能な条件: モデル設定 + APIキー + インデックス済みコンテンツ
+      const isReady = hasChatModel && hasEmbeddingModel && hasApiKey && hasIndexedContent;
 
       setSystemConfigStatus({
         hasChatModel,
@@ -568,15 +569,31 @@ function DashboardContent() {
                   {!systemConfigStatus.isReady && (
                     <div className="mt-3">
                       <p className="text-sm text-muted-foreground mb-3">
-                        システムを使用するには、チャット用モデル、ベクトル埋め込みモデルの選択とAPIキーの登録が必要です。
-                        {systemConfigStatus.chatModelName && systemConfigStatus.embeddingModelName && (
-                          <span className="block mt-1">
-                            {systemConfigStatus.chatModelName === systemConfigStatus.embeddingModelName
-                              ? 'モデルが同一のため、APIキーは1件必要です。'
-                              : 'モデルが異なるため、APIキーは2件必要です。'}
-                          </span>
-                        )}
+                        システムを使用するには、以下の設定が必要です：
                       </p>
+                      <ul className="text-sm text-muted-foreground mb-3 list-disc list-inside space-y-1">
+                        {!systemConfigStatus.hasChatModel && (
+                          <li>チャット用モデルの選択</li>
+                        )}
+                        {!systemConfigStatus.hasEmbeddingModel && (
+                          <li>ベクトル埋め込みモデルの選択</li>
+                        )}
+                        {!systemConfigStatus.hasApiKey && (
+                          <li>
+                            APIキーの登録
+                            {systemConfigStatus.chatModelName && systemConfigStatus.embeddingModelName && (
+                              <span className="ml-1">
+                                （{systemConfigStatus.chatModelName === systemConfigStatus.embeddingModelName
+                                  ? 'モデルが同一のため1件'
+                                  : 'モデルが異なるため2件'}必要）
+                              </span>
+                            )}
+                          </li>
+                        )}
+                        {!systemConfigStatus.hasIndexedContent && (
+                          <li>インデックス済みコンテンツの登録（コンテンツ管理からファイルをアップロードしてください）</li>
+                        )}
+                      </ul>
                       <Link href="/settings">
                         <Button variant="default" size="sm">
                           <Settings className="mr-2 h-4 w-4" />
