@@ -221,15 +221,32 @@ class VercelBlobStorage(StorageService):
         tenant_id: str,
         content_type: Optional[str] = None
     ) -> str:
-        """ファイルをアップロード"""
+        """
+        ファイルをアップロード
+        
+        Vercel Blob StorageのHTTP APIを使用してファイルをアップロードします。
+        ファイル名にサフィックスが付加されないように、クエリパラメータで
+        filenameを明示的に指定し、addRandomSuffix=falseを設定します。
+        """
         try:
+            from urllib.parse import urlencode
+            
             # パスを生成（tenant_id/file_name形式）
             path = f"{tenant_id}/{file_name}"
+            
+            # クエリパラメータを設定
+            # filename: ファイル名を明示的に指定
+            # addRandomSuffix: falseに設定してサフィックスの付加を防ぐ
+            query_params = {
+                "filename": file_name,
+                "addRandomSuffix": "false"
+            }
+            query_string = urlencode(query_params)
             
             # Vercel Blob Storage APIにアップロード
             async with httpx.AsyncClient() as client:
                 response = await client.put(
-                    f"{self.base_url}/{path}",
+                    f"{self.base_url}/{path}?{query_string}",
                     content=file_content,
                     headers={
                         "Authorization": f"Bearer {self.token}",
@@ -239,7 +256,9 @@ class VercelBlobStorage(StorageService):
                 )
                 response.raise_for_status()
             
-            # URLを返す（またはpathを返す）
+            # レスポンスから実際のファイル名を取得（サフィックスが付加されていないことを確認）
+            # レスポンスボディにurlが含まれている場合、それを解析してファイル名を取得
+            # ただし、addRandomSuffix=falseを指定しているため、指定したファイル名のままのはず
             storage_key = path
             logger.info(f"File uploaded to Vercel Blob Storage: {storage_key}")
             return storage_key

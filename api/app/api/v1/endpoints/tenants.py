@@ -44,13 +44,7 @@ async def get_tenants(
         status=status
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "list_tenants",
-        "tenants",
-        tenant_id=None
-    )
-    
+    # 参照系GETエンドポイントのため、監査ログ（audit_logs）には記録しない
     return tenants
 
 
@@ -79,13 +73,7 @@ async def get_embed_snippet(
             logger.error(f"埋め込みスニペット生成失敗: tenant_id={tenant_id}")
             raise TenantNotFoundError()
         
-        BusinessLogger.log_user_action(
-            str(current_user.id),
-            "get_embed_snippet",
-            "embed_snippet",
-            tenant_id=tenant_id
-        )
-        
+        # 埋め込みコード取得は参照系GETのため、監査ログには記録しない
         logger.info(f"埋め込みスニペット取得成功: tenant_id={tenant_id}")
         return snippet
         
@@ -114,13 +102,7 @@ async def get_tenant(
     if not tenant:
         raise TenantNotFoundError()
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_tenant",
-        "tenant",
-        tenant_id=tenant_id
-    )
-    
+    # テナント詳細はダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return tenant
 
 
@@ -206,13 +188,7 @@ async def get_tenant_stats(
     if not stats:
         raise TenantNotFoundError()
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_tenant_stats",
-        "tenant_stats",
-        tenant_id=tenant_id
-    )
-    
+    # テナント統計はダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return stats
 
 
@@ -346,13 +322,7 @@ async def get_tenant_users(
     
     users = await tenant_service.get_tenant_users(tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_tenant_users",
-        "tenant_users",
-        tenant_id=tenant_id
-    )
-    
+    # テナント配下ユーザー一覧は参照系GETのため、監査ログには記録しない
     return users
 
 
@@ -442,11 +412,5 @@ async def get_tenant_usage_summary(
     
     usage_summary = await tenant_service.get_tenant_usage_summary(tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_tenant_usage_summary",
-        "tenant_usage",
-        tenant_id=tenant_id
-    )
-    
+    # 使用量サマリはダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return usage_summary

@@ -30,13 +30,17 @@ async def get_recent_audit_logs(
     db: AsyncSession = Depends(get_db)
 ):
     """最近の監査ログを取得
-
+    
     - 認証必須
     - テナント分離: PLATFORM_ADMIN は全件、それ以外は自テナントのみ
     - limit: 1〜50
     - skip_audit: 監査ログ記録をスキップするかどうか（デフォルト: false）
       - true: 自動ポーリング時など、監査ログ記録をスキップ
       - false: 初回取得時など、監査ログ記録を実行
+    
+    メモ:
+        ダッシュボードの自動更新による監査ログ肥大化を防ぐため、
+        「初回取得（skip_audit=false）のみ」自分自身の取得イベントをaudit_logsに記録する。
     """
 
     stmt = select(

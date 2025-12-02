@@ -619,7 +619,7 @@ async def register_tenant(
             settings={
                 "max_storage_mb": PlanLimits.BASIC_PLAN_MAX_STORAGE_MB,
                 "max_queries_per_day": PlanLimits.BASIC_PLAN_MAX_QUERIES_PER_DAY,
-                "default_model": "gpt-4",
+                # チャット用モデルは自動でgpt-4を設定せず、テナント管理者が明示的に選択する
                 "chunk_size": 1024,
                 "chunk_overlap": 200,
                 "enable_api_access": True,

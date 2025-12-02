@@ -235,8 +235,6 @@ function DashboardContent() {
         apiClient.getContentStatsSummary().catch(() => ({ total_files: 0, status_counts: {}, total_chunks: 0, total_size_mb: 0, file_types: {} })),
       ]);
 
-      const hasChatModel = !!tenant?.settings?.default_model;
-      const hasEmbeddingModel = !!tenant?.settings?.embedding_model;
       const chatModel = tenant?.settings?.default_model || null;
       const embeddingModel = tenant?.settings?.embedding_model || null;
       
@@ -248,6 +246,10 @@ function DashboardContent() {
       // チャット用モデルとベクトル埋め込みモデルが同一の場合は1つ、異なる場合は2つ必要
       const requiredApiKeyCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
       const hasApiKey = apiKeyCount >= requiredApiKeyCount;
+
+      // モデル設定 + APIキー登録の両方が揃っている場合のみ「設定済み」とみなす
+      const hasChatModel = !!chatModel && apiKeyCount >= 1;
+      const hasEmbeddingModel = !!embeddingModel && apiKeyCount >= 1;
       
       const statusCounts: Record<string, number> = contentStats.status_counts ?? {};
       const indexedCount = statusCounts['INDEXED'] ?? 0;

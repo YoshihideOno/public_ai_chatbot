@@ -58,13 +58,7 @@ async def get_usage_stats(
         granularity=granularity
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_usage_stats",
-        "usage_stats",
-        tenant_id=tenant_id
-    )
-    
+    # 利用統計はダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return stats
 
 
@@ -101,13 +95,7 @@ async def get_usage_time_series(
         granularity=granularity
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_usage_time_series",
-        "usage_time_series",
-        tenant_id=tenant_id
-    )
-    
+    # 利用統計の時系列データは参照系GETのため、監査ログには記録しない
     return time_series
 
 
@@ -144,13 +132,7 @@ async def get_top_queries(
         limit=limit
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_top_queries",
-        "top_queries",
-        tenant_id=tenant_id
-    )
-    
+    # よくある質問TOPはダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return top_queries
 
 
@@ -185,13 +167,7 @@ async def get_llm_usage_stats(
         end_date=end_date
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_llm_usage_stats",
-        "llm_usage_stats",
-        tenant_id=tenant_id
-    )
-    
+    # LLM使用量統計は参照系GETのため、監査ログには記録しない
     return llm_stats
 
 
@@ -226,13 +202,7 @@ async def get_feedback_stats(
         end_date=end_date
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_feedback_stats",
-        "feedback_stats",
-        tenant_id=tenant_id
-    )
-    
+    # 評価統計は参照系GETのため、監査ログには記録しない
     return feedback_stats
 
 
@@ -255,13 +225,7 @@ async def get_storage_stats(
     
     storage_stats = await stats_service.get_storage_stats(tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_storage_stats",
-        "storage_stats",
-        tenant_id=tenant_id
-    )
-    
+    # ストレージ統計は参照系GETのため、監査ログには記録しない
     return storage_stats
 
 
@@ -291,13 +255,7 @@ async def get_dashboard_stats(
         period=period
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_dashboard_stats",
-        "dashboard_stats",
-        tenant_id=tenant_id if tenant_id != "system" else None
-    )
-    
+    # ダッシュボード統計は画面表示用の参照系GETのため、監査ログには記録しない
     return dashboard_stats
 
 
@@ -401,13 +359,7 @@ async def get_alerts(
     
     alerts = await monitoring_service.check_alerts(tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_alerts",
-        "alerts",
-        tenant_id=tenant_id
-    )
-    
+    # アラート一覧取得は参照系GETのため、監査ログには記録しない
     return alerts
 
 
@@ -421,13 +373,7 @@ async def get_system_health(
     
     health = await monitoring_service.get_system_health()
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_system_health",
-        "system_health",
-        tenant_id=None
-    )
-    
+    # システムヘルスチェックは参照系GETのため、監査ログには記録しない
     return health
 
 
@@ -494,13 +440,7 @@ async def get_monitoring_config(
         check_interval_minutes=5
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_monitoring_config",
-        "monitoring_config",
-        tenant_id=tenant_id
-    )
-    
+    # 監視設定の取得は参照系GETのため、監査ログには記録しない
     return config
 
 

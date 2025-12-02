@@ -100,13 +100,7 @@ async def get_contents(
         }
         contents.append(Content(**content_dict))
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "list_contents",
-        "contents",
-        tenant_id=tenant_id if tenant_id != "system" else None
-    )
-    
+    # コンテンツ一覧はダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return contents
 
 
@@ -307,13 +301,6 @@ async def get_content(
     # チャンク情報も取得
     chunks = await content_service.get_content_chunks(content_id, tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_content",
-        "content",
-        tenant_id=tenant_id
-    )
-    
     # Pydanticスキーマ経由で安全に整形（__dict__の直接展開は関係属性を含み衝突の原因となる）
     from app.schemas.content import ContentInDB
     base = ContentInDB.from_orm(content).dict()
@@ -331,6 +318,7 @@ async def get_content(
         })
     base["chunks"] = chunk_items
     base["chunk_count"] = len(chunk_items)
+    # コンテンツ詳細取得は参照系GETのため、監査ログには記録しない
     return ContentWithChunks(**base)
 
 
@@ -438,7 +426,7 @@ async def download_content(
         file_bytes = await storage.get_file(file_obj.s3_key)
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="ファイル取得に失敗しました")
-
+    
     # Content-Type 推定
     mime_map = {
         'PDF': 'application/pdf',
@@ -448,15 +436,15 @@ async def download_content(
         'TXT': 'text/plain; charset=utf-8',
     }
     content_type = mime_map.get(file_obj.file_type.value if getattr(file_obj, 'file_type', None) else 'TXT', 'application/octet-stream')
-
-    # 監査ログ
+    
+    # 元ファイルのダウンロード操作は重要なイベントのため、監査ログの記録を維持する
     BusinessLogger.log_user_action(
         str(current_user.id),
         "download_content",
         "content_download",
         tenant_id=tenant_id
     )
-
+    
     # ファイル名をRFC 5987形式でエンコード（日本語対応）
     encoded_filename = quote(file_obj.file_name, safe='')
     headers = {
@@ -520,13 +508,7 @@ async def get_content_chunks(
         limit=limit
     )
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_content_chunks",
-        "chunks",
-        tenant_id=tenant_id
-    )
-    
+    # チャンク一覧取得は参照系GETのため、監査ログには記録しない
     return chunks
 
 
@@ -577,7 +559,7 @@ async def export_contents(
         status=status_enum,
         search_query=search
     )
-
+    
     # エクスポート用データ作成（一覧表示フィールド）
     rows = []
     for f in files:
@@ -592,15 +574,15 @@ async def export_contents(
             "uploaded_at": f.uploaded_at.isoformat() if f.uploaded_at else None,
             "indexed_at": f.indexed_at.isoformat() if f.indexed_at else None,
         })
-
-    # 監査ログ
+    
+    # エクスポート操作はユーザーによる明示的なデータ取得のため、監査ログ記録を維持する
     BusinessLogger.log_user_action(
         str(current_user.id),
         "export_contents",
         "contents_export",
         tenant_id=tenant_id if tenant_id != "system" else None
     )
-
+    
     timestamp = dt.utcnow().strftime('%Y%m%d_%H%M%S')
 
     if format.lower() == 'json':
@@ -765,13 +747,7 @@ async def get_content_stats(
     
     stats = await content_service.get_content_stats(tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_content_stats",
-        "content_stats",
-        tenant_id=tenant_id
-    )
-    
+    # コンテンツ統計はダッシュボード表示用の参照系GETのため、監査ログには記録しない
     return stats
 
 
@@ -790,11 +766,5 @@ async def get_storage_usage(
     
     usage = await content_service.get_storage_usage(tenant_id)
     
-    BusinessLogger.log_user_action(
-        str(current_user.id),
-        "get_storage_usage",
-        "storage_usage",
-        tenant_id=tenant_id
-    )
-    
+    # ストレージ使用量取得は参照系GETのため、監査ログには記録しない
     return usage
