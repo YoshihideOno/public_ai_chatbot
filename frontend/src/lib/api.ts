@@ -83,6 +83,37 @@ export interface Content {
   file_url?: string;
 }
 
+export interface UploadTestResult {
+  message: string;
+  original_filename: string;
+  file_size: number;
+  results: Array<{
+    param_value: string;
+    param_description: string;
+    requested_filename: string;
+    actual_storage_key: string | null;
+    actual_filename: string | null;
+    suffix_added: boolean | null;
+    status: 'success' | 'error';
+    error?: string;
+  }>;
+  summary: {
+    total_tests: number;
+    successful: number;
+    failed: number;
+    no_suffix: Array<{
+      param_value: string;
+      param_description: string;
+      requested_filename: string;
+      actual_storage_key: string | null;
+      actual_filename: string | null;
+      suffix_added: boolean | null;
+      status: 'success' | 'error';
+      error?: string;
+    }>;
+  };
+}
+
 export interface ChatRequest {
   session_id: string;
   query: string;
@@ -540,7 +571,7 @@ export class ApiClient {
     description?: string, 
     tags?: string[],
     testParams?: boolean
-  ): Promise<Content | any> {
+  ): Promise<Content | UploadTestResult> {
     const formData = new FormData();
     formData.append('file', file);
     if (title) formData.append('title', title);
@@ -560,7 +591,7 @@ export class ApiClient {
     
     // テストモードの場合は、レスポンス全体を返す（resultsを含む）
     if (testParams) {
-      return response.data;
+      return response.data as UploadTestResult;
     }
     
     return response.data.content;
