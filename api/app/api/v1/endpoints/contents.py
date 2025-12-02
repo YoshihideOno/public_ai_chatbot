@@ -168,13 +168,18 @@ async def upload_file(
     current_user: User = Depends(require_admin_role()),
     db: AsyncSession = Depends(get_db)
 ):
-    """ファイルアップロード"""
+    """
+    ファイルアップロード（テストモード: 3つの異なるaddRandomSuffixパラメータ形式でアップロード）
+    
+    注意: 現在はテストモードとして、3つの異なるパラメータ形式（"false"、bool値のFalse、数値の0）で
+    アップロードします。後続の処理（RAGパイプライン）は実行しません。
+    正しいパラメータが判明したら、このコードを元に戻してください。
+    """
     # tenant_idの取得
     if current_user.role == UserRole.PLATFORM_ADMIN:
         tenant_id = None
     else:
         tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
-    content_service = ContentService(db)
     
     # ファイルサイズチェック
     file_content = await file.read()
@@ -189,80 +194,81 @@ async def upload_file(
     except ValueError:
         raise ValidationError(f"サポートされていないファイルタイプ: {file_extension}")
     
-    # Base64エンコード
-    import base64
-    file_content_b64 = base64.b64encode(file_content).decode('utf-8')
+    # テストモード: 3つの異なるパラメータ形式でアップロード
+    from app.services.storage_service import StorageServiceFactory
     
-    # タグの処理
-    tag_list = []
-    if tags:
-        tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+    # 元のファイル名を取得（拡張子を除く）
+    original_filename_without_ext = file.filename.rsplit('.', 1)[0] if '.' in file.filename else file.filename
+    file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'txt'
     
-    # タイトルの決定（ファイル名が長すぎる場合は切り詰める）
-    if title:
-        final_title = title
-    else:
-        # ファイル名から拡張子を除いた部分をタイトルとして使用
-        filename_without_ext = file.filename.split('.')[0] if '.' in file.filename else file.filename
-        # 255文字以内に制限（Pydanticバリデーションに合わせる）
-        final_title = filename_without_ext[:255] if len(filename_without_ext) > 255 else filename_without_ext
+    # テストするパラメータ形式: "false"、bool値のFalse、数値の0
+    test_param_configs = [
+        ("false", "文字列のfalse"),
+        (False, "bool値のFalse"),
+        (0, "数値の0"),
+    ]
     
-    # コンテンツデータ作成
-    content_data = ContentCreate(
-        title=final_title,
-        content_type=file_type,
-        description=description,
-        tags=tag_list,
-        file_content=file_content_b64
-    )
+    storage_service = StorageServiceFactory.create()
+    results = []
     
-    try:
-        content = await content_service.create_content(
-            content_data=content_data,
-            tenant_id=tenant_id,
-            user_id=str(current_user.id)
-        )
-        
-        BusinessLogger.log_user_action(
-            str(current_user.id),
-            "upload_file",
-            "content",
-            tenant_id=tenant_id,
-            request=request,
-            resource_id=str(content.id)
-        )
-
-        # 非同期SQLAlchemyセッションとPydanticのfrom_ormの相互作用により
-        # MissingGreenletエラーが発生するのを避けるため、
-        # 一覧取得と同様に明示的に辞書へマッピングしてからスキーマに詰め替える
-        from app.schemas.content import Content as ContentSchema
-
-        content_payload = ContentSchema(
-            id=str(content.id),
-            tenant_id=str(content.tenant_id),
-            title=content.title,
-            content_type=content.file_type.value,
-            description=content.description,
-            tags=content.tags if content.tags else [],
-            metadata=content.metadata_json if getattr(content, "metadata_json", None) else {},
-            file_name=content.file_name,
-            file_size=content.size_bytes,
-            status=content.status.value if content.status else None,
-            uploaded_at=content.uploaded_at,
-            indexed_at=content.indexed_at,
-            created_at=content.created_at,
-            updated_at=content.updated_at,
-        )
-        
-        return {
-            "message": "ファイルがアップロードされました",
-            "content": content_payload,
+    for param_value, param_description in test_param_configs:
+        try:
+            # ファイル名にパラメータ名を含める（識別のため）
+            if param_value is False:
+                param_str = "False"
+            elif param_value == 0:
+                param_str = "0"
+            else:
+                param_str = str(param_value)
+            
+            test_filename = f"{original_filename_without_ext}_param_{param_str}.{file_ext}"
+            
+            # ストレージに直接アップロード（DBには保存しない、後続処理も実行しない）
+            storage_key = await storage_service.upload_file(
+                file_content=file_content,
+                file_name=test_filename,
+                tenant_id=tenant_id or "test",
+                content_type=f"application/{file_ext}",
+                add_random_suffix_param=param_value
+            )
+            
+            # ストレージキーからファイル名部分を抽出
+            actual_filename = storage_key.split('/')[-1] if '/' in storage_key else storage_key
+            suffix_added = actual_filename != test_filename
+            
+            results.append({
+                "param_value": str(param_value) if param_value is not False else "False",
+                "param_description": param_description,
+                "requested_filename": test_filename,
+                "actual_storage_key": storage_key,
+                "actual_filename": actual_filename,
+                "suffix_added": suffix_added,
+                "status": "success"
+            })
+            
+        except Exception as e:
+            results.append({
+                "param_value": str(param_value) if param_value is not False else "False",
+                "param_description": param_description,
+                "requested_filename": test_filename if 'test_filename' in locals() else "N/A",
+                "actual_storage_key": None,
+                "suffix_added": None,
+                "status": "error",
+                "error": str(e)
+            })
+    
+    return {
+        "message": "テストモード: 3つの異なるパラメータ形式でアップロードしました（後続処理は実行していません）",
+        "original_filename": file.filename,
+        "file_size": len(file_content),
+        "results": results,
+        "summary": {
+            "total_tests": len(test_param_configs),
+            "successful": len([r for r in results if r["status"] == "success"]),
+            "failed": len([r for r in results if r["status"] == "error"]),
+            "no_suffix": [r for r in results if r.get("suffix_added") is False],
         }
-        
-    except ConflictError:
-        raise
-    except ValueError as e:
-        raise ValidationError(str(e))
+    }
 
 
 @router.get("/{content_id}", response_model=ContentWithChunks)

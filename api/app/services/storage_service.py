@@ -314,26 +314,37 @@ class VercelBlobStorage(StorageService):
                 logger.debug(f"Vercel Blob Storage response data: {response_data}")
                 logger.info(f"Vercel Blob Storage response keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'N/A'}")
                 
-                # レスポンスにpathnameフィールドが含まれている場合（実際のファイルパス）
-                if "pathname" in response_data:
-                    actual_path = response_data["pathname"]
-                    logger.info(f"Vercel Blob Storage pathname: {actual_path}")
-                    storage_key = actual_path
-                # pathnameがない場合は、urlフィールドからパスを抽出
-                elif "url" in response_data:
+                # レスポンスから実際のファイルパスを取得
+                # 重要: pathnameとurlが異なる場合がある
+                # - pathname: 要求したパス（サフィックスなし）
+                # - url: 実際に保存されたファイルのURL（サフィックス付きの可能性がある）
+                # 実際のファイル取得には、urlから抽出したパスを使用する必要がある
+                
+                if "url" in response_data:
                     from urllib.parse import urlparse
                     actual_url = response_data["url"]
                     parsed_url = urlparse(actual_url)
                     # URLからパスを抽出
                     # Vercel Blob StorageのURL形式: https://xxx.public.blob.vercel-storage.com/path/to/file.md
-                    # または: https://xxx.public.blob.vercel-storage.com/tenant_id/file_name-random_suffix.md
+                    # 実際のファイル名（サフィックス付きの可能性がある）を含む
                     url_path = parsed_url.path.lstrip('/')
-                    
-                    # Vercel Blob StorageのURLは、ドメイン部分が動的だが、パス部分は保存時に使用したパスと一致する
-                    # ただし、サフィックスが付加されている場合は、実際のファイルパスが異なる可能性がある
-                    # そのため、URLからパスを抽出する際は、そのまま使用する
                     actual_path = url_path
                     logger.info(f"Vercel Blob Storage URL: {actual_url}, extracted_path: {actual_path}")
+                    
+                    # pathnameも確認して、サフィックスが付加されているかどうかを判定
+                    if "pathname" in response_data:
+                        pathname = response_data["pathname"]
+                        logger.info(f"Vercel Blob Storage pathname: {pathname}")
+                        # pathnameとurlから抽出したパスが異なる場合、サフィックスが付加されている
+                        if pathname != actual_path:
+                            logger.warning(f"pathnameと実際のURLパスが異なります。pathname={pathname}, actual_path={actual_path}")
+                            logger.warning(f"サフィックスが付加されている可能性があります。実際のファイルパス（{actual_path}）を使用します。")
+                    
+                    storage_key = actual_path
+                elif "pathname" in response_data:
+                    # urlがない場合はpathnameを使用（フォールバック）
+                    actual_path = response_data["pathname"]
+                    logger.info(f"Vercel Blob Storage pathname: {actual_path} (urlフィールドがないためpathnameを使用)")
                     storage_key = actual_path
                 else:
                     # pathnameもurlもない場合は、指定したパスを使用
