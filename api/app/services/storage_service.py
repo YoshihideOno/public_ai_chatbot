@@ -318,37 +318,36 @@ class VercelBlobStorage(StorageService):
                 logger.debug(f"Vercel Blob Storage response data: {response_data}")
                 logger.info(f"Vercel Blob Storage response keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'N/A'}")
                 
-                # レスポンスから実際のファイルパスを取得
-                # 重要: pathnameとurlが異なる場合がある
+                # レスポンスから実際のファイルURL/パスを取得
+                # 重要: Vercel Blobでは、実際のオブジェクトは `*.public.blob.vercel-storage.com` 配下のURLで提供される
+                # - url: 実際にアクセス可能な完全URL（サフィックス付きの可能性がある）
                 # - pathname: 要求したパス（サフィックスなし）
-                # - url: 実際に保存されたファイルのURL（サフィックス付きの可能性がある）
-                # 実際のファイル取得には、urlから抽出したパスを使用する必要がある
+                #
+                # 後続処理（ベクターストア作成やエクスポートなど）で確実にファイルを取得できるよう、
+                # s3_key には「実際にアクセス可能な完全URL」を保存する。
+                # これにより、get_file()側ではURLをそのままGETすればよくなり、404を防止できる。
                 
                 if "url" in response_data:
                     from urllib.parse import urlparse
                     actual_url = response_data["url"]
                     parsed_url = urlparse(actual_url)
-                    # URLからパスを抽出
-                    # Vercel Blob StorageのURL形式: https://xxx.public.blob.vercel-storage.com/path/to/file.md
-                    # 実際のファイル名（サフィックス付きの可能性がある）を含む
                     url_path = parsed_url.path.lstrip('/')
-                    actual_path = url_path
-                    logger.info(f"Vercel Blob Storage URL: {actual_url}, extracted_path: {actual_path}")
+                    logger.info(f"Vercel Blob Storage URL: {actual_url}, extracted_path: {url_path}")
                     
-                    # pathnameも確認して、サフィックスが付加されているかどうかを判定
                     if "pathname" in response_data:
                         pathname = response_data["pathname"]
                         logger.info(f"Vercel Blob Storage pathname: {pathname}")
-                        # pathnameとurlから抽出したパスが異なる場合、サフィックスが付加されている
-                        if pathname != actual_path:
-                            logger.warning(f"pathnameと実際のURLパスが異なります。pathname={pathname}, actual_path={actual_path}")
-                            logger.warning(f"サフィックスが付加されている可能性があります。実際のファイルパス（{actual_path}）を使用します。")
+                        if pathname != url_path:
+                            logger.warning(f"pathnameと実際のURLパスが異なります。pathname={pathname}, actual_path={url_path}")
+                            logger.warning(f"サフィックスが付加されている可能性があります。実際のURL（{actual_url}）をs3_keyとして使用します。")
                     
-                    storage_key = actual_path
+                    # s3_key には完全URLを保存（実ファイルへの直接アクセス用）
+                    storage_key = actual_url
                 elif "pathname" in response_data:
                     # urlがない場合はpathnameを使用（フォールバック）
                     actual_path = response_data["pathname"]
-                    logger.info(f"Vercel Blob Storage pathname: {actual_path} (urlフィールドがないためpathnameを使用)")
+                    logger.info(f"Vercel Blob Storage pathnameのみ取得: {actual_path}")
+                    # この場合は管理API経由でのみアクセスできるため、base_urlと組み合わせて使用する
                     storage_key = actual_path
                 else:
                     # pathnameもurlもない場合は、指定したパスを使用
@@ -371,17 +370,29 @@ class VercelBlobStorage(StorageService):
             raise
     
     async def get_file(self, storage_key: str) -> bytes:
-        """ファイルを取得"""
+        """ファイルを取得
+        
+        引数:
+            storage_key: ストレージキー（完全URLまたはパス）
+        
+        戻り値:
+            bytes: ファイル内容
+        """
         try:
-            # Vercel Blob Storage APIから取得
+            # storage_key が完全URLの場合はそのままアクセス
+            if storage_key.startswith("http://") or storage_key.startswith("https://"):
+                url = storage_key
+                headers = {}  # public URLの場合は認証不要
+            else:
+                # パスのみの場合は管理API経由で取得
+                url = f"{self.base_url}/{storage_key}"
+                headers = {
+                    "Authorization": f"Bearer {self.token}",
+                }
+            
+            # Vercel Blob Storage から取得
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.base_url}/{storage_key}",
-                    headers={
-                        "Authorization": f"Bearer {self.token}",
-                    },
-                    timeout=30.0
-                )
+                response = await client.get(url, headers=headers, timeout=30.0)
                 response.raise_for_status()
                 return response.content
             
@@ -393,12 +404,27 @@ class VercelBlobStorage(StorageService):
             raise
     
     async def delete_file(self, storage_key: str) -> bool:
-        """ファイルを削除"""
+        """ファイルを削除
+        
+        引数:
+            storage_key: ストレージキー（完全URLまたはパス）
+        
+        戻り値:
+            bool: 削除に成功した場合True
+        """
         try:
+            # storage_key が完全URLの場合はパス部分のみ抽出して管理APIに渡す
+            if storage_key.startswith("http://") or storage_key.startswith("https://"):
+                from urllib.parse import urlparse
+                parsed_url = urlparse(storage_key)
+                path_only = parsed_url.path.lstrip('/')
+            else:
+                path_only = storage_key
+            
             # Vercel Blob Storage APIから削除
             async with httpx.AsyncClient() as client:
                 response = await client.delete(
-                    f"{self.base_url}/{storage_key}",
+                    f"{self.base_url}/{path_only}",
                     headers={
                         "Authorization": f"Bearer {self.token}",
                     },
