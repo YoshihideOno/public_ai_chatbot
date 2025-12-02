@@ -4,11 +4,12 @@
  * コンテンツ処理完了時のメール通知の有効/無効を設定するコンポーネント
  */
 
-"use client";
+'use client';
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
+import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 export default function TenantWebhookSettings() {
   const { user } = useAuth();
   const tenantId = user?.tenant_id ?? null;
+  const { tenant, reloadTenant } = useTenant();
 
   const [enableNotification, setEnableNotification] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,23 +27,20 @@ export default function TenantWebhookSettings() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!tenantId) return;
-    try {
-      setIsLoading(true);
-      setError(null);
-      const tenant = await apiClient.getTenant(tenantId);
-      const settings = tenant?.settings || {};
-      setEnableNotification(typeof settings.enable_webhook === "boolean" ? settings.enable_webhook : true);
-    } catch (error: unknown) {
-      console.error('Failed to load webhook settings', error);
-      setError("設定の読み込みに失敗しました");
-    } finally {
-      setIsLoading(false);
+  /**
+   * TenantContext から取得した設定値をローカル状態に反映
+   */
+  useEffect(() => {
+    if (!tenant) {
+      // テナント情報がまだない場合はデフォルトtrue（従来挙動を維持）
+      setEnableNotification(true);
+      return;
     }
-  }, [tenantId]);
-
-  useEffect(() => { void load(); }, [load]);
+    const settings = tenant.settings || {};
+    setEnableNotification(
+      typeof settings.enable_webhook === "boolean" ? settings.enable_webhook : true,
+    );
+  }, [tenant]);
 
   const onSave = useCallback(async () => {
     if (!tenantId) {
@@ -56,9 +55,10 @@ export default function TenantWebhookSettings() {
       await apiClient.updateTenantSettings(tenantId, {
         enable_webhook: enableNotification,
       });
+      // グローバルなテナント情報を更新して他画面にも反映
+      await reloadTenant();
       setSuccess("設定を保存しました");
       setShowSuccessDialog(true);
-      await load();
     } catch (error: unknown) {
       console.error('Failed to save webhook settings', error);
       const message = error instanceof Error ? error.message : "設定の保存に失敗しました";

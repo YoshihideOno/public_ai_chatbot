@@ -8,7 +8,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,31 +16,13 @@ import TenantApiKeys from '@/components/settings/TenantApiKeys';
 import TenantLlmModels from '@/components/settings/TenantLlmModels';
 import TenantChunkSettings from '@/components/settings/TenantChunkSettings';
 import TenantWebhookSettings from '@/components/settings/TenantWebhookSettings';
-import { apiClient, Tenant } from '@/lib/api';
+import { Tenant } from '@/lib/api';
+import { useTenant } from '@/contexts/TenantContext';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const isTenantAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'PLATFORM_ADMIN';
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [loadingTenant, setLoadingTenant] = useState(false);
-  const [tenantError, setTenantError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadTenant = async () => {
-      if (!user?.tenant_id) return;
-      try {
-        setLoadingTenant(true);
-        setTenantError(null);
-        const t = await apiClient.getTenant(user.tenant_id);
-        setTenant(t);
-      } catch {
-        setTenantError('テナント情報の取得に失敗しました');
-      } finally {
-        setLoadingTenant(false);
-      }
-    };
-    loadTenant();
-  }, [user?.tenant_id]);
+  const { tenant, isLoading: loadingTenant, error: tenantError } = useTenant();
 
   return (
     <ProtectedRoute>

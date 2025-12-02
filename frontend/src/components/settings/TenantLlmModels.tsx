@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient, TenantSettings } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 export function TenantLlmModels() {
   const { user } = useAuth();
   const tenantId = user?.tenant_id || '';
+  const { tenant, reloadTenant } = useTenant();
 
   const [providers, setProviders] = useState<Array<{ provider: string; models: string[] }>>([]);
   const [error, setError] = useState<string | null>(null);
@@ -30,28 +32,44 @@ export function TenantLlmModels() {
 
   const allModels = useMemo(() => Array.from(new Set(providers.flatMap(p => p.models))), [providers]);
 
-  const load = useCallback(async () => {
+  /**
+   * モデル一覧の読み込み
+   *
+   * テナント情報自体はTenantContextから取得するため、ここでは
+   * プロバイダー／モデルの一覧取得のみを行います。
+   */
+  const loadProviders = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       const p = await apiClient.getProvidersAndModels();
       setProviders(p.providers || []);
-      if (tenantId) {
-        // テナント情報を取得して現在の設定を反映（getTenantを利用）
-        try {
-          const tenant = await apiClient.getTenant(tenantId);
-          setDefaultModel(tenant?.settings?.default_model || UNSELECTED_VALUE);
-          setEmbeddingModel(tenant?.settings?.embedding_model || UNSELECTED_VALUE);
-        } catch {}
-      }
     } catch {
       setError('モデル一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  }, [tenantId]);
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void loadProviders();
+  }, [loadProviders]);
+
+  /**
+   * テナント設定の反映
+   *
+   * TenantContext から取得したテナント情報が変化した場合に、
+   * デフォルトモデルと埋め込みモデルの選択値を更新します。
+   */
+  useEffect(() => {
+    if (!tenant) {
+      setDefaultModel(UNSELECTED_VALUE);
+      setEmbeddingModel(UNSELECTED_VALUE);
+      return;
+    }
+    setDefaultModel(tenant.settings?.default_model || UNSELECTED_VALUE);
+    setEmbeddingModel(tenant.settings?.embedding_model || UNSELECTED_VALUE);
+  }, [tenant]);
 
   const onSave = async () => {
     try {
@@ -67,9 +85,9 @@ export function TenantLlmModels() {
       };
       console.log('保存する設定:', settings);
       await apiClient.updateTenantSettings(tenantId, settings);
+      // グローバルなテナント情報を再取得して他画面にも反映
+      await reloadTenant();
       setShowSuccessDialog(true);
-      // 保存後に再読み込み
-      await load();
     } catch (e: unknown) {
       console.error('保存エラー:', e);
       const errorMessage = e instanceof Error ? e.message : 'モデル設定の保存に失敗しました';

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { 
   Users, 
@@ -83,6 +84,7 @@ function DashboardContent() {
   });
 
   const { user } = useAuth();
+  const { tenant, isLoading: tenantLoading, reloadTenant } = useTenant();
   const widgetScriptUrl = process.env.NEXT_PUBLIC_WIDGET_CDN_URL || 'https://cdn.rag-chatbot.com/widget.js';
   const [activities, setActivities] = useState<{
     id: string;
@@ -229,14 +231,26 @@ function DashboardContent() {
       setSystemConfigStatus(prev => ({ ...prev, isLoading: true, error: null }));
 
       // テナント情報 / APIキー / コンテンツ統計を並行取得
-      const [tenant, apiKeys, contentStats] = await Promise.all([
-        apiClient.getTenant(user.tenant_id),
+      // テナント情報はTenantContextから取得し、未ロードの場合のみ個別取得
+      const tenantPromise = (async () => {
+        if (tenant) {
+          return tenant;
+        }
+        // コンテキストにまだテナント情報がない場合は、一度だけ直接取得
+        const fetched = await apiClient.getTenant(user.tenant_id);
+        // 取得した値をグローバルにも反映
+        await reloadTenant();
+        return fetched;
+      })();
+
+      const [tenantData, apiKeys, contentStats] = await Promise.all([
+        tenantPromise,
         apiClient.getApiKeys().catch(() => ({ api_keys: [], total_count: 0 })),
         apiClient.getContentStatsSummary().catch(() => ({ total_files: 0, status_counts: {}, total_chunks: 0, total_size_mb: 0, file_types: {} })),
       ]);
 
-      const chatModel = tenant?.settings?.default_model || null;
-      const embeddingModel = tenant?.settings?.embedding_model || null;
+      const chatModel = tenantData?.settings?.default_model || null;
+      const embeddingModel = tenantData?.settings?.embedding_model || null;
       
       // 有効なAPIキー（is_active = true）のみをカウント
       const activeApiKeys = apiKeys.api_keys?.filter(apiKey => apiKey.is_active) || [];
@@ -257,7 +271,7 @@ function DashboardContent() {
       // チャット用モデルとベクトル埋め込みモデルの各APIキーが各1件ずつ登録されていることがOK条件
       const hasApiKey = hasChatModelApiKey && hasEmbeddingModelApiKey;
 
-      // モデル設定のみをチェック（APIキーの有無は判定条件に含めない）
+      // モデル設定のみをチェック
       const hasChatModel = !!chatModel;
       const hasEmbeddingModel = !!embeddingModel;
       
@@ -271,8 +285,8 @@ function DashboardContent() {
         hasChatModel,
         hasEmbeddingModel,
         hasApiKey,
-        chatModelName: tenant?.settings?.default_model || null,
-        embeddingModelName: tenant?.settings?.embedding_model || null,
+        chatModelName: tenantData?.settings?.default_model || null,
+        embeddingModelName: tenantData?.settings?.embedding_model || null,
         apiKeyCount,
         hasIndexedContent,
         indexedCount,

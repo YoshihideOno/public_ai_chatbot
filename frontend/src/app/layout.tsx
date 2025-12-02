@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/contexts/AuthContext';
+import { TenantProvider } from '@/contexts/TenantContext';
 import { ConditionalLayout } from '@/components/layout/ConditionalLayout';
 import { ChatWidget } from '@/components/widget/ChatWidget';
 
@@ -31,9 +32,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-          <ConditionalLayout>
-            {children}
-          </ConditionalLayout>
+          <TenantProvider>
+            <ConditionalLayout>
+              {children}
+            </ConditionalLayout>
+          </TenantProvider>
         </AuthProvider>
         <ChatWidget />
       </body>
