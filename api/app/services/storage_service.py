@@ -266,9 +266,52 @@ class VercelBlobStorage(StorageService):
                 )
                 response.raise_for_status()
             
-            # レスポンスから実際のファイル名を取得
-            # addRandomSuffix=falseを指定しているため、指定したファイル名のままのはず
-            storage_key = path
+            # レスポンスボディから実際のファイルパスを取得
+            # Vercel Blob StorageはJSON形式でレスポンスを返す
+            # @vercel/blobのPutBlobResult型に基づき、以下のフィールドが含まれる可能性がある:
+            # - url: 完全なファイルURL
+            # - pathname: ファイルパス（存在する場合）
+            # - size: ファイルサイズ
+            # - uploadedAt: アップロード日時
+            # など
+            try:
+                import json
+                response_data = response.json()
+                # デバッグ用にレスポンスの全フィールドをログ出力
+                logger.debug(f"Vercel Blob Storage response data: {response_data}")
+                logger.info(f"Vercel Blob Storage response keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'N/A'}")
+                
+                # レスポンスにpathnameフィールドが含まれている場合（実際のファイルパス）
+                if "pathname" in response_data:
+                    actual_path = response_data["pathname"]
+                    logger.info(f"Vercel Blob Storage pathname: {actual_path}")
+                    storage_key = actual_path
+                # pathnameがない場合は、urlフィールドからパスを抽出
+                elif "url" in response_data:
+                    from urllib.parse import urlparse
+                    actual_url = response_data["url"]
+                    parsed_url = urlparse(actual_url)
+                    # URLからパスを抽出
+                    # Vercel Blob StorageのURL形式: https://xxx.public.blob.vercel-storage.com/path/to/file.md
+                    # または: https://xxx.public.blob.vercel-storage.com/tenant_id/file_name-random_suffix.md
+                    url_path = parsed_url.path.lstrip('/')
+                    
+                    # Vercel Blob StorageのURLは、ドメイン部分が動的だが、パス部分は保存時に使用したパスと一致する
+                    # ただし、サフィックスが付加されている場合は、実際のファイルパスが異なる可能性がある
+                    # そのため、URLからパスを抽出する際は、そのまま使用する
+                    actual_path = url_path
+                    logger.info(f"Vercel Blob Storage URL: {actual_url}, extracted_path: {actual_path}")
+                    storage_key = actual_path
+                else:
+                    # pathnameもurlもない場合は、指定したパスを使用
+                    logger.warning(f"Vercel Blob Storage response does not contain 'pathname' or 'url' field: {response_data}")
+                    storage_key = path
+                    
+            except (json.JSONDecodeError, KeyError, Exception) as e:
+                # JSON解析エラーまたはフィールドがない場合は、指定したパスを使用
+                logger.warning(f"Failed to parse Vercel Blob Storage response: {str(e)}, response_text: {response.text[:200] if hasattr(response, 'text') else 'N/A'}, using original path: {path}")
+                storage_key = path
+            
             logger.info(f"File uploaded to Vercel Blob Storage: {storage_key} (addRandomSuffix=false)")
             return storage_key
             

@@ -242,14 +242,24 @@ function DashboardContent() {
       const activeApiKeys = apiKeys.api_keys?.filter(apiKey => apiKey.is_active) || [];
       const apiKeyCount = activeApiKeys.length;
       
-      // APIキーの必要数の判定
-      // チャット用モデルとベクトル埋め込みモデルが同一の場合は1つ、異なる場合は2つ必要
-      const requiredApiKeyCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
-      const hasApiKey = apiKeyCount >= requiredApiKeyCount;
+      // チャット用モデルに対応するAPIキーが存在するかチェック
+      // モデル名が一致するAPIキーが1件以上存在する必要がある
+      const hasChatModelApiKey = chatModel
+        ? activeApiKeys.some(apiKey => apiKey.model === chatModel)
+        : false;
+      
+      // ベクトル埋め込みモデルに対応するAPIキーが存在するかチェック
+      // モデル名が一致するAPIキーが1件以上存在する必要がある
+      const hasEmbeddingModelApiKey = embeddingModel
+        ? activeApiKeys.some(apiKey => apiKey.model === embeddingModel)
+        : false;
+      
+      // チャット用モデルとベクトル埋め込みモデルの各APIキーが各1件ずつ登録されていることがOK条件
+      const hasApiKey = hasChatModelApiKey && hasEmbeddingModelApiKey;
 
-      // モデル設定 + APIキー登録の両方が揃っている場合のみ「設定済み」とみなす
-      const hasChatModel = !!chatModel && apiKeyCount >= 1;
-      const hasEmbeddingModel = !!embeddingModel && apiKeyCount >= 1;
+      // モデル設定のみをチェック（APIキーの有無は判定条件に含めない）
+      const hasChatModel = !!chatModel;
+      const hasEmbeddingModel = !!embeddingModel;
       
       const statusCounts: Record<string, number> = contentStats.status_counts ?? {};
       const indexedCount = statusCounts['INDEXED'] ?? 0;
@@ -539,12 +549,21 @@ function DashboardContent() {
                     </div>
                     <span className="text-sm text-muted-foreground">
                       {systemConfigStatus.hasApiKey
-                        ? `${systemConfigStatus.apiKeyCount}件有効`
+                        ? `チャット用・埋め込み用各1件登録済み`
                         : (() => {
                             const chatModel = systemConfigStatus.chatModelName;
                             const embeddingModel = systemConfigStatus.embeddingModelName;
-                            const requiredCount = (chatModel && embeddingModel && chatModel === embeddingModel) ? 1 : 2;
-                            return `不足（${requiredCount}件必要、現在有効${systemConfigStatus.apiKeyCount}件）`;
+                            if (!chatModel && !embeddingModel) {
+                              return '未設定';
+                            }
+                            const missing = [];
+                            if (chatModel) {
+                              missing.push('チャット用モデル用');
+                            }
+                            if (embeddingModel) {
+                              missing.push('ベクトル埋め込みモデル用');
+                            }
+                            return `不足（${missing.join('・')}のAPIキーが必要）`;
                           })()}
                     </span>
                   </div>
