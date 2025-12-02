@@ -6,7 +6,7 @@ import terser from '@rollup/plugin-terser';
 export default {
   input: 'src/index.js',
   output: {
-    file: 'dist/widget.js',
+    file: 'widget.js',
     format: 'iife',
     name: 'RagChatWidget',
     compact: true
