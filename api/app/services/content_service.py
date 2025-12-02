@@ -326,6 +326,10 @@ class ContentService:
                 # 即時にPROCESSINGへ更新（一覧で進行中表示）
                 db_file.status = FileStatus.PROCESSING
                 await self.db.commit()
+                # 非同期セッションではcommit時に属性がexpireされるため、
+                # レスポンス生成時の属性アクセスでMissingGreenletが発生しないよう
+                # ここで明示的にrefreshして値をロードしておく
+                await self.db.refresh(db_file)
 
                 file_id_str = str(db_file.id)
 
