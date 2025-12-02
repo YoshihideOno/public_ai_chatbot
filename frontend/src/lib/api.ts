@@ -565,38 +565,6 @@ export class ApiClient {
     await this.client.delete(`/contents/${id}`);
   }
 
-  async uploadFile(
-    file: File, 
-    title?: string, 
-    description?: string, 
-    tags?: string[],
-    testParams?: boolean
-  ): Promise<Content | UploadTestResult> {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (title) formData.append('title', title);
-    if (description) formData.append('description', description);
-    if (tags) formData.append('tags', tags.join(','));
-
-    // テストモードのクエリパラメータを追加
-    const url = testParams 
-      ? '/contents/upload?test_params=true' 
-      : '/contents/upload';
-
-    const response = await this.client.post(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    
-    // テストモードの場合は、レスポンス全体を返す（resultsを含む）
-    if (testParams) {
-      return response.data as UploadTestResult;
-    }
-    
-    return response.data.content;
-  }
-
   // ダウンロード（元ファイルバイナリ）
   async downloadContent(id: string): Promise<{ blob: Blob; filename?: string }> {
     const response = await this.client.get(`/contents/${id}/download`, {
