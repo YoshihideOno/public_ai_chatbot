@@ -611,6 +611,33 @@ export class ApiClient {
     return { blob: response.data as Blob, filename };
   }
 
+  async uploadFile(file: File, title?: string, description?: string, tags?: string[]): Promise<Content> {
+    /**
+     * ファイルをアップロードして新規コンテンツを作成する
+     *
+     * 引数:
+     *   file: アップロードするファイル
+     *   title: コンテンツタイトル（省略時はサーバ側で決定）
+     *   description: コンテンツ説明
+     *   tags: タグ配列
+     *
+     * 戻り値:
+     *   作成されたコンテンツ情報
+     */
+    const formData = new FormData();
+    formData.append('file', file);
+    if (title) formData.append('title', title);
+    if (description) formData.append('description', description);
+    if (tags) formData.append('tags', tags.join(','));
+
+    const response = await this.client.post('/contents/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.content;
+  }
+
   // エクスポート（CSV/JSON）
   async exportContents(params: { fileType?: string; status?: string; search?: string; format: 'csv' | 'json' }): Promise<{ blob: Blob; filename?: string }> {
     const query = new URLSearchParams();

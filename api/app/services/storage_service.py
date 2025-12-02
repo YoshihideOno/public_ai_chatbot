@@ -242,14 +242,14 @@ class VercelBlobStorage(StorageService):
         仕様:
         - PUTリクエストでファイルコンテンツを直接送信
         - ファイル名はパスに含める
-        - メタデータ（addRandomSuffixなど）はクエリパラメータで指定
+        - メタデータ（addRandomSuffix, allowOverwrite など）はクエリパラメータで指定
         
         引数:
             file_content: ファイルのバイト内容
             file_name: ファイル名
             tenant_id: テナントID
             content_type: MIMEタイプ（オプション）
-            add_random_suffix_param: addRandomSuffixパラメータの値（テスト用、Noneの場合は"false"を使用）
+            add_random_suffix_param: addRandomSuffixパラメータの値（テスト用、Noneの場合はbool値のFalseを使用）
         """
         try:
             from urllib.parse import urlencode
@@ -260,10 +260,13 @@ class VercelBlobStorage(StorageService):
             
             # クエリパラメータでメタデータを指定
             # @vercel/blobのput関数の第3引数（オプション）に相当する設定
-            # addRandomSuffix: false を指定してサフィックスの付加を防ぐ
+            # - access: public/private
+            # - addRandomSuffix: false を指定してサフィックスの付加を防ぐ
+            # - allowOverwrite: true を指定して同一pathnameでの上書きを許可
             # テスト用: add_random_suffix_paramが指定されている場合は、その値を使用
             query_params = {
-                "access": "public"  # 公開アクセスを許可（必要に応じて変更可能）
+                "access": "public",      # 公開アクセスを許可（必要に応じて変更可能）
+                "allowOverwrite": "true" # 上書きを許可（公式ドキュメントに基づく推奨設定）
             }
             
             # addRandomSuffixパラメータの設定
@@ -280,8 +283,9 @@ class VercelBlobStorage(StorageService):
                     # 既に文字列の場合はそのまま使用
                     query_params["addRandomSuffix"] = str(add_random_suffix_param)
             else:
-                # デフォルト: 文字列の"false"を使用
-                query_params["addRandomSuffix"] = "false"
+                # デフォルト: bool値のFalseを使用し、"false"として送信
+                default_add_random_suffix: bool = False
+                query_params["addRandomSuffix"] = str(default_add_random_suffix).lower()
             
             query_string = urlencode(query_params)
             
