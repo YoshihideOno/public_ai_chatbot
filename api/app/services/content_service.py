@@ -342,7 +342,7 @@ class ContentService:
                 )
                 
                 if not is_test_environment:
-                    # 本番環境でのみ_bg_process関数を定義
+                    # 本番環境でのみ_bg_process関数を定義し、バックグラウンドで実行
                     async def _bg_process(file_id: str, tenant_id_bg: str, chunk_size_bg: int, chunk_overlap_bg: int) -> None:
                         """
                         バックグラウンドでRAGパイプラインを実行する補助関数。
@@ -455,9 +455,23 @@ class ContentService:
                         )
                     )
                 else:
-                    # テスト環境ではバックグラウンド処理をスキップ（MissingGreenletエラーを回避）
-                    logger.info(f"テスト環境: BG処理をスキップ: file_id={file_id_str}")
-                    # ステータスは既にPROCESSINGに設定されているため、そのままにする
+                    # テスト環境ではバックグラウンド処理の代わりに同期的にRAGパイプラインを実行し、
+                    # テストからのポーリングでINDEXED/FAILEDになることを保証する
+                    logger.info(f"テスト環境: RAGパイプラインを同期実行: file_id={file_id_str}")
+                    try:
+                        from app.services.rag_pipeline import RAGPipeline
+                        
+                        rag_pipeline = RAGPipeline(self.db)
+                        await rag_pipeline.process_file(
+                            file_id_str,
+                            tenant_id,
+                            chunk_size=resolved_chunk_size,
+                            chunk_overlap=resolved_chunk_overlap
+                        )
+                        # パイプライン実行後の最新状態を反映
+                        await self.db.refresh(db_file)
+                    except Exception as e:
+                        logger.error(f"テスト環境でのRAGパイプライン実行エラー: file_id={file_id_str}, error={str(e)}", exc_info=True)
             except Exception as e:
                 logger.error(f"BG起動エラー: file_id={db_file.id}, error={str(e)}")
         
