@@ -171,7 +171,7 @@ async def upload_file(
     """
     ファイルアップロード（テストモード: 3つの異なるaddRandomSuffixパラメータ形式でアップロード）
     
-    注意: 現在はテストモードとして、3つの異なるパラメータ形式（"false"、bool値のFalse、数値の0）で
+    注意: 現在はテストモードとして、3つの異なるパラメータ形式（"true"、bool値のTrue、数値の1）で
     アップロードします。後続の処理（RAGパイプライン）は実行しません。
     正しいパラメータが判明したら、このコードを元に戻してください。
     """
@@ -201,11 +201,12 @@ async def upload_file(
     original_filename_without_ext = file.filename.rsplit('.', 1)[0] if '.' in file.filename else file.filename
     file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'txt'
     
-    # テストするパラメータ形式: "false"、bool値のFalse、数値の0
+    # テストするパラメータ形式: "true"、bool値のTrue、数値の1
+    # 逆の可能性を確認するため、true系のパラメータをテスト
     test_param_configs = [
-        ("false", "文字列のfalse"),
-        (False, "bool値のFalse"),
-        (0, "数値の0"),
+        ("true", "文字列のtrue"),
+        (True, "bool値のTrue"),
+        (1, "数値の1"),
     ]
     
     storage_service = StorageServiceFactory.create()
@@ -214,10 +215,10 @@ async def upload_file(
     for param_value, param_description in test_param_configs:
         try:
             # ファイル名にパラメータ名を含める（識別のため）
-            if param_value is False:
-                param_str = "False"
-            elif param_value == 0:
-                param_str = "0"
+            if param_value is True:
+                param_str = "True"
+            elif param_value == 1:
+                param_str = "1"
             else:
                 param_str = str(param_value)
             
@@ -237,7 +238,7 @@ async def upload_file(
             suffix_added = actual_filename != test_filename
             
             results.append({
-                "param_value": str(param_value) if param_value is not False else "False",
+                "param_value": str(param_value) if param_value is not True else "True",
                 "param_description": param_description,
                 "requested_filename": test_filename,
                 "actual_storage_key": storage_key,
@@ -248,7 +249,7 @@ async def upload_file(
             
         except Exception as e:
             results.append({
-                "param_value": str(param_value) if param_value is not False else "False",
+                "param_value": str(param_value) if param_value is not True else "True",
                 "param_description": param_description,
                 "requested_filename": test_filename if 'test_filename' in locals() else "N/A",
                 "actual_storage_key": None,
