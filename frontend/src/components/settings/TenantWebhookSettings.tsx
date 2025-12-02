@@ -66,7 +66,7 @@ export default function TenantWebhookSettings() {
     } finally {
       setIsLoading(false);
     }
-  }, [tenantId, enableNotification, load]);
+  }, [tenantId, enableNotification, reloadTenant]);
 
   return (
     <div className="space-y-4">

@@ -84,7 +84,11 @@ function DashboardContent() {
   });
 
   const { user } = useAuth();
-  const { tenant, isLoading: tenantLoading, reloadTenant } = useTenant();
+  const {
+    tenant: tenantInfo,
+    isLoading: tenantLoading,
+    reloadTenant,
+  } = useTenant();
   const widgetScriptUrl = process.env.NEXT_PUBLIC_WIDGET_CDN_URL || 'https://cdn.rag-chatbot.com/widget.js';
   const [activities, setActivities] = useState<{
     id: string;
@@ -233,11 +237,15 @@ function DashboardContent() {
       // テナント情報 / APIキー / コンテンツ統計を並行取得
       // テナント情報はTenantContextから取得し、未ロードの場合のみ個別取得
       const tenantPromise = (async () => {
-        if (tenant) {
-          return tenant;
+        if (tenantInfo) {
+          return tenantInfo;
         }
         // コンテキストにまだテナント情報がない場合は、一度だけ直接取得
-        const fetched = await apiClient.getTenant(user.tenant_id);
+        const currentTenantId = user?.tenant_id;
+        if (!currentTenantId) {
+          throw new Error('tenant_id is not set');
+        }
+        const fetched = await apiClient.getTenant(currentTenantId);
         // 取得した値をグローバルにも反映
         await reloadTenant();
         return fetched;
@@ -302,7 +310,7 @@ function DashboardContent() {
         error: '設定状況の取得に失敗しました',
       }));
     }
-  }, [user?.tenant_id]);
+  }, [user?.tenant_id, tenantInfo, reloadTenant]);
 
   useEffect(() => {
     fetchDashboardStats();
