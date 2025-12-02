@@ -768,3 +768,119 @@ async def get_storage_usage(
     
     # ストレージ使用量取得は参照系GETのため、監査ログには記録しない
     return usage
+
+
+@router.post("/test-upload-params")
+async def test_upload_params(
+    file: UploadFile = FastAPIFile(...),
+    current_user: User = Depends(require_admin_role()),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    テスト用エンドポイント: 同じファイルを複数のaddRandomSuffixパラメータ形式でアップロードし、
+    どの形式でサフィックスが付加されないかを確認する
+    
+    注意: このエンドポイントはテスト目的のため、本番環境では無効化することを推奨
+    """
+    from app.core.config import settings
+    from app.services.storage_service import StorageServiceFactory
+    import uuid
+    import base64
+    
+    # テスト環境でのみ有効（本番環境では無効化）
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="このエンドポイントは本番環境では使用できません"
+        )
+    
+    # tenant_idの取得
+    if current_user.role == UserRole.PLATFORM_ADMIN:
+        tenant_id = "test"
+    else:
+        tenant_id = str(current_user.tenant_id) if current_user.tenant_id else "test"
+    
+    # ファイル内容を読み込み
+    file_content = await file.read()
+    file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'txt'
+    
+    # テスト用のベースファイル名
+    test_id = str(uuid.uuid4())[:8]
+    base_filename = f"test_file_{test_id}.{file_extension}"
+    
+    # テストするパラメータ形式
+    # ユーザーの要望: "false"、bool値のFalse、数値の0の3種類
+    test_params = [
+        ("false", "文字列のfalse"),
+        (False, "bool値のFalse"),
+        (0, "数値の0"),
+    ]
+    
+    storage_service = StorageServiceFactory.create()
+    results = []
+    
+    # 元のファイル名を取得（拡張子を除く）
+    original_filename_without_ext = file.filename.rsplit('.', 1)[0] if '.' in file.filename else file.filename
+    
+    for param_value, param_description in test_params:
+        try:
+            # ファイル名にパラメータ名を含める（識別のため）
+            # 例: "service_info_param_false.md", "service_info_param_False.md", "service_info_param_0.md"
+            if param_value is False:
+                param_str = "False"  # bool値のFalseを識別
+            elif param_value == 0:
+                param_str = "0"  # 数値の0を識別
+            else:
+                param_str = str(param_value)
+            
+            test_filename = f"{original_filename_without_ext}_param_{param_str}.{file_extension}"
+            
+            # アップロード
+            storage_key = await storage_service.upload_file(
+                file_content=file_content,
+                file_name=test_filename,
+                tenant_id=tenant_id,
+                content_type=f"application/{file_extension}",
+                add_random_suffix_param=param_value
+            )
+            
+            # 結果を記録
+            # ストレージキーからファイル名部分を抽出（tenant_id/file_name形式）
+            actual_filename = storage_key.split('/')[-1] if '/' in storage_key else storage_key
+            # サフィックスが付加されているかどうかを判定
+            # 実際のファイル名が要求したファイル名と完全に一致する場合は、サフィックスなし
+            suffix_added = actual_filename != test_filename
+            
+            results.append({
+                "param_value": param_value,
+                "param_description": param_description,
+                "requested_filename": test_filename,
+                "actual_storage_key": storage_key,
+                "actual_filename": actual_filename,
+                "suffix_added": suffix_added,
+                "status": "success"
+            })
+            
+        except Exception as e:
+            results.append({
+                "param_value": param_value,
+                "param_description": param_description,
+                "requested_filename": test_filename if 'test_filename' in locals() else "N/A",
+                "actual_storage_key": None,
+                "suffix_added": None,
+                "status": "error",
+                "error": str(e)
+            })
+    
+    return {
+        "test_id": test_id,
+        "base_filename": base_filename,
+        "file_size": len(file_content),
+        "results": results,
+        "summary": {
+            "total_tests": len(test_params),
+            "successful": len([r for r in results if r["status"] == "success"]),
+            "failed": len([r for r in results if r["status"] == "error"]),
+            "no_suffix": [r for r in results if r.get("suffix_added") is False],
+        }
+    }

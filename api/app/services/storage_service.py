@@ -25,7 +25,8 @@ class StorageService(ABC):
         file_content: bytes, 
         file_name: str, 
         tenant_id: str,
-        content_type: Optional[str] = None
+        content_type: Optional[str] = None,
+        add_random_suffix_param: Optional[str] = None
     ) -> str:
         """
         ファイルをアップロード
@@ -35,6 +36,7 @@ class StorageService(ABC):
             file_name: ファイル名
             tenant_id: テナントID
             content_type: MIMEタイプ（オプション）
+            add_random_suffix_param: addRandomSuffixパラメータの値（テスト用、Noneの場合はデフォルト値を使用）
         
         戻り値:
             str: ストレージ内のファイルパス/URL（s3_keyに保存される値）
@@ -142,9 +144,14 @@ class LocalFileStorage(StorageService):
         file_content: bytes, 
         file_name: str, 
         tenant_id: str,
-        content_type: Optional[str] = None
+        content_type: Optional[str] = None,
+        add_random_suffix_param: Optional[str] = None
     ) -> str:
-        """ファイルをアップロード"""
+        """
+        ファイルをアップロード
+        
+        注意: LocalFileStorageではadd_random_suffix_paramは無視されます
+        """
         try:
             file_path = self._get_file_path(tenant_id, file_name)
             
@@ -219,7 +226,8 @@ class VercelBlobStorage(StorageService):
         file_content: bytes, 
         file_name: str, 
         tenant_id: str,
-        content_type: Optional[str] = None
+        content_type: Optional[str] = None,
+        add_random_suffix_param: Optional[str] = None
     ) -> str:
         """
         ファイルをアップロード
@@ -235,6 +243,13 @@ class VercelBlobStorage(StorageService):
         - PUTリクエストでファイルコンテンツを直接送信
         - ファイル名はパスに含める
         - メタデータ（addRandomSuffixなど）はクエリパラメータで指定
+        
+        引数:
+            file_content: ファイルのバイト内容
+            file_name: ファイル名
+            tenant_id: テナントID
+            content_type: MIMEタイプ（オプション）
+            add_random_suffix_param: addRandomSuffixパラメータの値（テスト用、Noneの場合は"false"を使用）
         """
         try:
             from urllib.parse import urlencode
@@ -246,10 +261,28 @@ class VercelBlobStorage(StorageService):
             # クエリパラメータでメタデータを指定
             # @vercel/blobのput関数の第3引数（オプション）に相当する設定
             # addRandomSuffix: false を指定してサフィックスの付加を防ぐ
+            # テスト用: add_random_suffix_paramが指定されている場合は、その値を使用
             query_params = {
-                "addRandomSuffix": "false",
                 "access": "public"  # 公開アクセスを許可（必要に応じて変更可能）
             }
+            
+            # addRandomSuffixパラメータの設定
+            if add_random_suffix_param is not None:
+                # テスト用: 指定された形式でパラメータを追加
+                # HTTPクエリパラメータは文字列として送信されるため、bool値や数値を文字列に変換
+                if isinstance(add_random_suffix_param, bool):
+                    # bool値のFalse/Trueを文字列に変換
+                    query_params["addRandomSuffix"] = str(add_random_suffix_param).lower()
+                elif isinstance(add_random_suffix_param, (int, float)):
+                    # 数値を文字列に変換
+                    query_params["addRandomSuffix"] = str(add_random_suffix_param)
+                else:
+                    # 既に文字列の場合はそのまま使用
+                    query_params["addRandomSuffix"] = str(add_random_suffix_param)
+            else:
+                # デフォルト: 文字列の"false"を使用
+                query_params["addRandomSuffix"] = "false"
+            
             query_string = urlencode(query_params)
             
             # Vercel Blob Storage APIにアップロード
