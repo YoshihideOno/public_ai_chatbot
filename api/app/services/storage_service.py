@@ -357,7 +357,7 @@ class VercelBlobStorage(StorageService):
             except (json.JSONDecodeError, KeyError, Exception) as e:
                 # JSON解析エラーまたはフィールドがない場合は、指定したパスを使用
                 logger.warning(f"Failed to parse Vercel Blob Storage response: {str(e)}, response_text: {response.text[:200] if hasattr(response, 'text') else 'N/A'}, using original path: {path}")
-            storage_key = path
+                storage_key = path
             
             logger.info(f"File uploaded to Vercel Blob Storage: {storage_key} (addRandomSuffix=false)")
             return storage_key

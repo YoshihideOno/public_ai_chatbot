@@ -898,6 +898,16 @@
           this.toggleDialog();
         }
       });
+
+      // ウィンドウリサイズ時の位置調整
+      let resizeTimeout;
+      w.addEventListener('resize', () => {
+        // デバウンス処理（リサイズイベントが頻繁に発火するのを防ぐ）
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          this.adjustPositionOnResize();
+        }, 100);
+      });
     }
 
     /**
@@ -989,6 +999,88 @@
 
       this.toggleBtn.addEventListener('mousedown', startDrag);
       this.toggleBtn.addEventListener('touchstart', startDrag, { passive: false });
+    }
+
+    /**
+     * ウィンドウリサイズ時の位置調整
+     * ウィジェットが画面外に出ていないかチェックし、画面内に収まるように位置を調整
+     */
+    adjustPositionOnResize() {
+      if (!this.host) {
+        return;
+      }
+
+      const rect = this.host.getBoundingClientRect();
+      const widgetWidth = rect.width || 80; // ウィジェットの幅（デフォルト80px）
+      const widgetHeight = rect.height || 80; // ウィジェットの高さ（デフォルト80px）
+      
+      const windowWidth = w.innerWidth;
+      const windowHeight = w.innerHeight;
+      
+      // 現在の位置を取得（left/top が設定されている場合）
+      let currentX = this.currentX;
+      let currentY = this.currentY;
+      
+      // 位置が right/bottom で設定されている場合は、left/top に変換
+      if (this.host.style.right !== 'auto' || this.host.style.bottom !== 'auto') {
+        // right/bottom で設定されている場合は、left/top に変換
+        if (this.host.style.right !== 'auto') {
+          const rightValue = parseFloat(this.host.style.right) || 20;
+          currentX = windowWidth - widgetWidth - rightValue;
+        }
+        if (this.host.style.bottom !== 'auto') {
+          const bottomValue = parseFloat(this.host.style.bottom) || 20;
+          currentY = windowHeight - widgetHeight - bottomValue;
+        }
+      } else {
+        // left/top で設定されている場合は、現在の値を取得
+        currentX = rect.left;
+        currentY = rect.top;
+      }
+      
+      // 画面外に出ているかチェック
+      let needsAdjustment = false;
+      let newX = currentX;
+      let newY = currentY;
+      
+      // 右端が画面外に出ている場合
+      if (currentX + widgetWidth > windowWidth) {
+        newX = Math.max(0, windowWidth - widgetWidth);
+        needsAdjustment = true;
+      }
+      
+      // 左端が画面外に出ている場合
+      if (currentX < 0) {
+        newX = 0;
+        needsAdjustment = true;
+      }
+      
+      // 下端が画面外に出ている場合
+      if (currentY + widgetHeight > windowHeight) {
+        newY = Math.max(0, windowHeight - widgetHeight);
+        needsAdjustment = true;
+      }
+      
+      // 上端が画面外に出ている場合
+      if (currentY < 0) {
+        newY = 0;
+        needsAdjustment = true;
+      }
+      
+      // 位置調整が必要な場合
+      if (needsAdjustment) {
+        this.host.style.position = 'fixed';
+        this.host.style.left = newX + 'px';
+        this.host.style.top = newY + 'px';
+        this.host.style.right = 'auto';
+        this.host.style.bottom = 'auto';
+        
+        this.currentX = newX;
+        this.currentY = newY;
+        
+        // 位置を保存
+        this.saveState();
+      }
     }
 
     /**
