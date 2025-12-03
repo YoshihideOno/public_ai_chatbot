@@ -19,11 +19,77 @@
    - 各HTMLページの `<head>` に `<script src="config.js"></script>` を追加
    - 埋め込みコード内の `tenantId` と `apiKey` を `WIDGET_CONFIG.tenantId` と `WIDGET_CONFIG.apiKey` に変更
 
+## ローカル開発
+
+ローカルで静的サイトを表示するには、以下のいずれかの方法を使用してください。
+
+### 方法1: PythonのHTTPサーバー（推奨）
+
+Python 3がインストールされている場合：
+
+```bash
+cd static-site
+python3 -m http.server 8080
+```
+
+または：
+
+```bash
+cd static-site
+python -m http.server 8080
+```
+
+ブラウザで `http://localhost:8080` にアクセスします。
+
+### 方法2: Node.jsのserve
+
+Node.jsがインストールされている場合：
+
+```bash
+cd static-site
+npx serve -p 8080
+```
+
+または、グローバルにインストールする場合：
+
+```bash
+npm install -g serve
+cd static-site
+serve -p 8080
+```
+
+ブラウザで `http://localhost:8080` にアクセスします。
+
+### 方法3: PHPのビルトインサーバー
+
+PHPがインストールされている場合：
+
+```bash
+cd static-site
+php -S localhost:8080
+```
+
+ブラウザで `http://localhost:8080` にアクセスします。
+
+### 方法4: 直接ファイルを開く（簡易）
+
+HTTPサーバーを使わずに直接ファイルを開くこともできますが、一部の機能（CORS、相対パスなど）が正しく動作しない場合があります：
+
+```bash
+cd static-site
+# macOSの場合
+open index.html
+# Linuxの場合
+xdg-open index.html
+# Windowsの場合
+start index.html
+```
+
 ## 使用方法
 
-1. このディレクトリをWebサーバーに配置します。
+1. ローカル開発サーバーを起動します（上記の方法を参照）。
 
-2. ブラウザで `index.html` を開きます。
+2. ブラウザで `http://localhost:8080` にアクセスします。
 
 3. 右下に表示されるチャットボタンをクリックして、AIチャットボットを開きます。
 

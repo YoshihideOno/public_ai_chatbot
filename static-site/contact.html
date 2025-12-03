@@ -160,21 +160,20 @@
   </footer>
 
   <!-- チャットウィジェット埋め込みコード -->
-  <!-- 設定ファイルを読み込む -->
-  <script src="config.js"></script>
   <script>
     (function(w,d,s,o,f,js,fjs){
       w['RAGChatWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
       js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
       js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
-    }(window,document,'script','ragChat',WIDGET_CDN_URL));
+    }(window,document,'script','ragChat','https://ai-chatbot-project-widget.vercel.app/widget.js'));
     
     ragChat('init', {
-      tenantId: WIDGET_CONFIG.tenantId,
-      apiKey: WIDGET_CONFIG.apiKey,
-      apiBaseUrl: WIDGET_CONFIG.apiBaseUrl,
-      theme: WIDGET_CONFIG.theme,
-      position: WIDGET_CONFIG.position
+      tenantId: 'ae99c744-a84c-4bbc-a030-1f604ebe0b26',
+      apiKey: 'sqAnPYmYun1EDL7L7y51cQS1CtOKRrwquapnEAoTAxvMo3IYLKjH40gy6ehz35LB',
+      apiBaseUrl: 'https://aichatbotapp-production.up.railway.app/api/v1',
+      theme: 'light',
+      position: 'bottom-right',
+      initialMessage: 'こんにちは！何かお手伝いできることはありますか？' // オプション: 初期メッセージ
     });
   </script>
 </body>
