@@ -174,14 +174,16 @@ async def get_tenant_from_user(
 async def get_tenant_from_widget_auth(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID", description="テナントID"),
     x_api_key: str = Header(..., alias="X-API-Key", description="テナントAPIキー"),
+    origin: Optional[str] = Header(None, alias="Origin", description="リクエスト元オリジン"),
     db: AsyncSession = Depends(get_db)
 ) -> Tenant:
     """
-    Widget用認証: テナントIDとAPIキーで認証
+    Widget用認証: テナントID・APIキー・オリジンで認証
     
     引数:
         x_tenant_id: リクエストヘッダーから取得するテナントID
         x_api_key: リクエストヘッダーから取得するAPIキー
+        origin: ブラウザから送信されるOriginヘッダー（ウィジェット設置オリジン）
         db: データベースセッション
         
     戻り値:
@@ -216,11 +218,45 @@ async def get_tenant_from_widget_auth(
         
         # テナントのステータス確認
         if tenant.status != "ACTIVE":
-            SecurityLogger.warning(f"非アクティブテナント: tenant_id={tenant.id}, status={tenant.status}")
+            SecurityLogger.warning(
+                f"非アクティブテナント: tenant_id={tenant.id}, status={tenant.status}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Tenant is not active",
             )
+
+        # ウィジェット許可オリジンの検証（allowed_widget_originsはCSV形式）
+        try:
+            raw_origins = (tenant.allowed_widget_origins or "").strip()
+            allowed_origins: List[str] = []
+            if raw_origins:
+                allowed_origins = [
+                    o.strip()
+                    for o in raw_origins.split(",")
+                    if o.strip()
+                ]
+        except Exception as parse_error:
+            logger.error(
+                "ウィジェット許可オリジンの解析に失敗しました",
+                error=str(parse_error),
+            )
+            allowed_origins = []
+
+        # Originヘッダが存在し、許可オリジンが設定されている場合のみチェックを行う
+        if origin and allowed_origins:
+            if origin not in allowed_origins:
+                SecurityLogger.warning(
+                    f"許可されていないオリジンからのウィジェットアクセス: "
+                    f"tenant_id={tenant.id}, origin={origin}, allowed_origins={allowed_origins}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Origin not allowed",
+                )
+        # Originが存在しない場合や許可オリジンが未設定の場合は、
+        # 既存環境との互換性のためここでは拒否せず通過させる。
+        # 実運用ではallowed_widget_originsを設定することを推奨。
         
         return tenant
         

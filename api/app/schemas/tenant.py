@@ -56,6 +56,8 @@ class TenantUpdate(BaseModel):
     plan: Optional[TenantPlan] = None
     status: Optional[TenantStatus] = None
     settings: Optional[Dict[str, Any]] = None
+    # ウィジェット設置を許可するオリジン（CSV形式: "https://foo.com,https://bar.com"）
+    allowed_widget_origins: Optional[str] = None
     
     @validator('name')
     def validate_name(cls, v):
@@ -81,6 +83,8 @@ class TenantUpdate(BaseModel):
 class TenantInDB(TenantBase):
     id: str
     api_key: str
+    # ウィジェット設置を許可するオリジン（CSV形式文字列）
+    allowed_widget_origins: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
@@ -105,6 +109,8 @@ class TenantPublic(TenantBase):
     - api_key は含めない
     """
     id: str
+    # ウィジェット設置を許可するオリジン（CSV形式文字列）
+    allowed_widget_origins: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None

@@ -44,7 +44,9 @@ class Tenant(Base):
         domain: テナントのドメイン名（ユニーク）
         plan: プラン種別（FREE, BASIC, PRO, ENTERPRISE）
         status: ステータス（ACTIVE, SUSPENDED, DELETED）
+        api_key: ウィジェット・API用のテナント共通APIキー
         settings: テナント固有の設定（JSON形式）
+        allowed_widget_origins: ウィジェット設置を許可するオリジンのCSV文字列
         knowledge_registered_at: 初回ナレッジ登録日時
         created_at: 作成日時
         updated_at: 更新日時
@@ -59,6 +61,8 @@ class Tenant(Base):
     status = Column(String(50), nullable=False, default="ACTIVE")
     api_key = Column(String(255), nullable=False, unique=True, default=generate_api_key)
     settings = Column(JSONB, nullable=False, server_default='{}')
+    # ウィジェット設置を許可するオリジン（CSV形式: "https://foo.com,https://bar.com"）
+    allowed_widget_origins = Column(Text, nullable=True)
     knowledge_registered_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

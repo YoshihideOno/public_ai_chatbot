@@ -13,6 +13,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
@@ -22,6 +23,7 @@ export default function TenantWebhookSettings() {
   const { tenant, reloadTenant } = useTenant();
 
   const [enableNotification, setEnableNotification] = useState<boolean>(true);
+  const [widgetOrigins, setWidgetOrigins] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -34,12 +36,17 @@ export default function TenantWebhookSettings() {
     if (!tenant) {
       // テナント情報がまだない場合はデフォルトtrue（従来挙動を維持）
       setEnableNotification(true);
+      setWidgetOrigins('');
       return;
     }
     const settings = tenant.settings || {};
     setEnableNotification(
       typeof settings.enable_webhook === "boolean" ? settings.enable_webhook : true,
     );
+    // allowed_widget_origins はCSV形式で保存されている前提
+    // TenantContextの型に含まれていない可能性があるため、安全にアクセス
+    const anyTenant = tenant as typeof tenant & { allowed_widget_origins?: string | null };
+    setWidgetOrigins(anyTenant.allowed_widget_origins || '');
   }, [tenant]);
 
   const onSave = useCallback(async () => {
@@ -52,9 +59,16 @@ export default function TenantWebhookSettings() {
       setError(null);
       setSuccess(null);
 
+      // コンテンツ処理完了通知の設定を更新
       await apiClient.updateTenantSettings(tenantId, {
         enable_webhook: enableNotification,
       });
+
+      // 設置ドメイン（allowed_widget_origins）を更新
+      await apiClient.updateTenant(tenantId, {
+        allowed_widget_origins: widgetOrigins || null,
+      });
+
       // グローバルなテナント情報を更新して他画面にも反映
       await reloadTenant();
       setSuccess("設定を保存しました");
@@ -85,7 +99,7 @@ export default function TenantWebhookSettings() {
         </Alert>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="enable_notification">コンテンツ処理完了通知</Label>
@@ -97,6 +111,20 @@ export default function TenantWebhookSettings() {
             id="enable_notification"
             checked={enableNotification}
             onCheckedChange={setEnableNotification}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="widget_origins">設置ドメイン</Label>
+          <p className="text-sm text-muted-foreground">
+            ウィジェットを設置するドメインをカンマ区切りで指定します（例: https://example.com,https://sub.example.com）
+          </p>
+          <Input
+            id="widget_origins"
+            value={widgetOrigins}
+            onChange={(e) => setWidgetOrigins(e.target.value)}
+            placeholder="https://example.com"
             disabled={isLoading}
           />
         </div>
