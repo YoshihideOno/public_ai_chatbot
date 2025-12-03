@@ -190,12 +190,13 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_DEMO_PROJECT_ID }}
       
       # 静的サイト: Vercelデプロイ（Demo）
+      # 注意: Vercelプロジェクトの設定で「Root Directory」を「static-site」に設定してください
       - name: Deploy Static Site to Vercel (Demo)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
-          cd static-site
+          npm install -g vercel
           # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
-          rm -rf .vercel
+          rm -rf static-site/.vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_STATIC_SITE_DEMO_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_STATIC_SITE_DEMO_ORG_ID }}
@@ -300,12 +301,13 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROD_PROJECT_ID }}
       
       # 静的サイト: Vercelデプロイ（本番環境）
+      # 注意: Vercelプロジェクトの設定で「Root Directory」を「static-site」に設定してください
       - name: Deploy Static Site to Vercel (Production)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
-          cd static-site
+          npm install -g vercel
           # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
-          rm -rf .vercel
+          rm -rf static-site/.vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_STATIC_SITE_PROD_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_STATIC_SITE_PROD_ORG_ID }}
@@ -405,12 +407,13 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROD_PROJECT_ID }}
       
       # 静的サイト: Vercelデプロイ（本番環境）
+      # 注意: Vercelプロジェクトの設定で「Root Directory」を「static-site」に設定してください
       - name: Deploy Static Site to Vercel (Production)
         if: ${{ github.event.inputs.deploy_frontend == 'true' }}
         run: |
-          cd static-site
+          npm install -g vercel
           # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
-          rm -rf .vercel
+          rm -rf static-site/.vercel
           vercel --prod --yes --token ${{ secrets.VERCEL_STATIC_SITE_PROD_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_STATIC_SITE_PROD_ORG_ID }}
