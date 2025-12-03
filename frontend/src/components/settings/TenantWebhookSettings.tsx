@@ -84,10 +84,6 @@ export default function TenantWebhookSettings() {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">
-        コンテンツ処理完了時に、アップロードしたユーザーにメール通知を送信します。
-      </div>
-
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
