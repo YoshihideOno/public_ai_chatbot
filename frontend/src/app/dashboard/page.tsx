@@ -318,27 +318,21 @@ function DashboardContent() {
     fetchTenantForEmbed();
   }, [fetchDashboardStats, fetchSystemConfigStatus, fetchTenantForEmbed]);
 
-  // 最近の活動取得
+  // 最近の活動取得（初回のみ）
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
     let isCancelled = false;
-    const fetchActivities = async (skipAudit: boolean = false) => {
+    const fetchActivities = async () => {
       try {
-        const items = await apiClient.getRecentActivities(10, skipAudit);
+        const items = await apiClient.getRecentActivities(10, false);
         if (!isCancelled) setActivities(items);
       } catch {
         // サイレント
       }
     };
-    // 初回（監査ログを記録）
-    fetchActivities(false);
-    // 軽いポーリング（10秒、監査ログを記録しない）
-    timer = setInterval(() => {
-      fetchActivities(true);
-    }, 10000);
+    // 初回のみ取得（監査ログを記録）
+    fetchActivities();
     return () => {
       isCancelled = true;
-      if (timer) clearInterval(timer);
     };
   }, []);
 
