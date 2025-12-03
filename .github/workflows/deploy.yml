@@ -189,6 +189,18 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_DEMO_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_DEMO_PROJECT_ID }}
       
+      # 静的サイト: Vercelデプロイ（Demo）
+      - name: Deploy Static Site to Vercel (Demo)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          cd static-site
+          # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
+          rm -rf .vercel
+          vercel --prod --yes --token ${{ secrets.VERCEL_STATIC_SITE_DEMO_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_STATIC_SITE_DEMO_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_STATIC_SITE_DEMO_PROJECT_ID }}
+      
       # バックエンド: Railwayデプロイ
       - name: Deploy Backend to Railway
         if: ${{ github.event.inputs.deploy_backend == 'true' }}
@@ -231,6 +243,13 @@ jobs:
         run: |
           sleep 10
           curl -f ${{ secrets.DEMO_WIDGET_BASE_URL }}/widget.js || exit 1
+      
+      # 静的サイト: ヘルスチェック（Demo）
+      - name: Health check (Demo Static Site)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          sleep 10
+          curl -f ${{ secrets.DEMO_STATIC_SITE_BASE_URL }}/ || exit 1
 
   # Step2: サービス提供環境デプロイ（AWS）
   deploy-step2-aws:
@@ -280,6 +299,18 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_PROD_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROD_PROJECT_ID }}
       
+      # 静的サイト: Vercelデプロイ（本番環境）
+      - name: Deploy Static Site to Vercel (Production)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          cd static-site
+          # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
+          rm -rf .vercel
+          vercel --prod --yes --token ${{ secrets.VERCEL_STATIC_SITE_PROD_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_STATIC_SITE_PROD_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_STATIC_SITE_PROD_PROJECT_ID }}
+      
       # バックエンド: ECRにイメージをプッシュ
       - name: Build and push Docker image to ECR
         if: ${{ github.event.inputs.deploy_backend == 'true' }}
@@ -322,6 +353,13 @@ jobs:
         run: |
           sleep 10
           curl -f ${{ secrets.PROD_WIDGET_BASE_URL }}/widget.js || exit 1
+      
+      # 静的サイト: ヘルスチェック（本番環境）
+      - name: Health check (Production Static Site)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          sleep 10
+          curl -f ${{ secrets.PROD_STATIC_SITE_BASE_URL }}/ || exit 1
 
   # Step2: サービス提供環境デプロイ（Azure）
   deploy-step2-azure:
@@ -366,6 +404,18 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_WIDGET_PROD_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROD_PROJECT_ID }}
       
+      # 静的サイト: Vercelデプロイ（本番環境）
+      - name: Deploy Static Site to Vercel (Production)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          cd static-site
+          # .vercelディレクトリが存在する場合は削除（プロジェクト設定の競合を防ぐ）
+          rm -rf .vercel
+          vercel --prod --yes --token ${{ secrets.VERCEL_STATIC_SITE_PROD_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_STATIC_SITE_PROD_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_STATIC_SITE_PROD_PROJECT_ID }}
+      
       # バックエンド: ACRにイメージをビルド・プッシュ
       - name: Build and push Docker image to ACR
         if: ${{ github.event.inputs.deploy_backend == 'true' }}
@@ -408,4 +458,11 @@ jobs:
         run: |
           sleep 10
           curl -f ${{ secrets.PROD_WIDGET_BASE_URL }}/widget.js || exit 1
+      
+      # 静的サイト: ヘルスチェック（本番環境）
+      - name: Health check (Production Static Site)
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        run: |
+          sleep 10
+          curl -f ${{ secrets.PROD_STATIC_SITE_BASE_URL }}/ || exit 1
 
