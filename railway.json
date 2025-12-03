@@ -2,11 +2,6 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    // 注意:
-    // - Railwayのサービス設定で「Build Context」を `api` ディレクトリに
-    //   設定している前提で、このパスはコンテナ内から見たDockerfile名のみを指定する
-    // - ビルドコンテキストが `api` のため、Dockerfileは `api/Dockerfile` だが、
-    //   ここでは相対パスとして `Dockerfile` を指定するのがRailwayの推奨形
     "dockerfilePath": "Dockerfile",
     "watchPatterns": [
       "api/**/*.py",
