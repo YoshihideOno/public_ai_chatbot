@@ -60,6 +60,8 @@ export interface Tenant {
   plan: 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE';
   status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
   api_key: string;
+  // ウィジェットを設置可能なオリジンのCSV文字列（例: "https://example.com,https://sub.example.com"）
+  allowed_widget_origins?: string | null;
   settings: TenantSettings;
   created_at: string;
   updated_at?: string;
