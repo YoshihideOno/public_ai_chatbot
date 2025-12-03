@@ -17,7 +17,14 @@ import sqlalchemy as sa
 
 # Alembic revision identifiers, used by Alembic.
 revision: str = "7f8e9d0c1b2a"
-down_revision: Union[str, None] = "4b9f2a1c0b2a"
+# 注意:
+# - もともと "4b9f2a1c0b2a" を down_revision としていましたが、
+#   すでに "ef3cc2e2afca" が "4b9f2a1c0b2a" と "aad8ed256fe4" を
+#   マージする merge head となっているため、このリビジョンが
+#   直接 "4b9f2a1c0b2a" から分岐すると複数 head が発生します。
+# - そのため、このマイグレーションは最新の統合済み head
+#   "ef3cc2e2afca" を継承するように変更し、履歴を一本化します。
+down_revision: Union[str, None] = "ef3cc2e2afca"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
