@@ -55,25 +55,10 @@ def create_app() -> FastAPI:
     logger.info(f"BACKEND_CORS_ORIGINS raw: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"Parsed CORS origins: {cors_origins}")
     
-    # 許可されたオリジンのリストを取得
-    # DEBUG=true の場合でも、環境変数で設定されたオリジンを含める
-    dev_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ]
-    
-    if settings.DEBUG:
-        # DEBUG=trueの場合、環境変数のオリジンとローカルオリジンを結合
-        allowed_origins = list(set(cors_origins + dev_origins))
-    else:
-        # DEBUG=falseの場合、環境変数のオリジンのみ使用
-        allowed_origins = cors_origins
-    
-    print(f"[CORS CONFIG] Allowed origins: {allowed_origins}")
+    # パターンA: CORSは全オリジン許可とし、実際のOrigin制御はアプリケーション層で実施
+    # allowed_originsはログ用のメタ情報として保持し、フィルタリングには使用しない
+    allowed_origins = ["*"]
+    print(f"[CORS CONFIG] Allowed origins (global): {allowed_origins}")
 
     # CORSヘッダーをすべてのリクエストに追加するミドルウェア
     # RailwayのエッジサーバーがOPTIONSリクエストを処理する可能性があるため、
@@ -87,28 +72,30 @@ def create_app() -> FastAPI:
         # OPTIONSリクエストの場合は、即座にCORSヘッダーを返す
         if request.method == "OPTIONS":
             print(f"[CORS] OPTIONS request detected. Origin: {origin}")
-            print(f"[CORS] Allowed origins: {allowed_origins}")
+            print(f"[CORS] Allowed origins (global): {allowed_origins}")
             
-            # オリジンチェック
-            if origin and origin in allowed_origins:
-                print(f"[CORS] Origin {origin} is allowed")
-                response = Response(status_code=200)
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-                response.headers["Access-Control-Allow-Headers"] = "Accept, Accept-Language, Authorization, Content-Language, Content-Type, Origin, X-API-Key, X-Requested-With, X-Tenant-ID"
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Max-Age"] = "600"
-                return response
-            else:
-                print(f"[CORS] Origin {origin} is not in allowed origins: {allowed_origins}")
+            # パターンA: CORSレイヤではオリジンをフィルタせず、すべて許可
+            response = Response(status_code=200)
+            # Originが送信されている場合はその値を返し、無い場合はワイルドカードを使用
+            response.headers["Access-Control-Allow-Origin"] = origin or "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = (
+                "Accept, Accept-Language, Authorization, Content-Language, "
+                "Content-Type, Origin, X-API-Key, X-Requested-With, X-Tenant-ID"
+            )
+            # allow_credentials=False とするため、Access-Control-Allow-Credentialsは付与しない
+            response.headers["Access-Control-Max-Age"] = "600"
+            return response
         
         # 通常のリクエストの場合
         response = await call_next(request)
         
-        # レスポンスにCORSヘッダーを追加
-        if origin and origin in allowed_origins:
+        # レスポンスにCORSヘッダーを追加（全オリジン許可）
+        if origin:
             response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        # allow_credentials=False とするため、Access-Control-Allow-Credentialsは付与しない
         
         return response
 
@@ -129,79 +116,30 @@ def create_app() -> FastAPI:
             raise
 
     # CORS middleware
-    # 開発環境では広く許可し、運用環境では設定値に基づく厳格な許可を適用
-    # 注意: 上記のミドルウェアでCORSヘッダーを追加しているため、
-    # このCORSミドルウェアは補助的な役割を果たします
-    
-    if settings.DEBUG:
-        # DEBUG=trueの場合、環境変数のオリジンとローカルオリジンを結合
-        debug_origins = list(set(
-            settings.get_cors_origins() + [
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:3001",
-                "http://127.0.0.1:3001",
-                "http://localhost:8080",
-                "http://127.0.0.1:8080",
-                "null",  # file://プロトコル用
-            ]
-        ))
-        logger.info(f"DEBUG mode: Using combined CORS origins: {debug_origins}")
-        
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=debug_origins,
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-            allow_headers=[
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "X-Requested-With",
-                "Origin",
-                "X-Tenant-ID",  # Widget認証用
-                "X-API-Key",    # Widget認証用
-            ],
-            expose_headers=[
-                "Content-Length",
-                "Content-Type",
-                "X-Request-Id",
-            ],
-        )
-    else:
-        # 本番環境: 環境変数で設定されたCORSオリジンを使用
-        # BACKEND_CORS_ORIGINSはカンマ区切りの文字列として環境変数から読み込まれる
-        cors_origins = settings.BACKEND_CORS_ORIGINS
-        if not cors_origins or len(cors_origins) == 0:
-            logger.warning("BACKEND_CORS_ORIGINS is empty! CORS will block all requests.")
-            # フォールバック: デフォルト値を設定（本番環境では環境変数を設定すべき）
-            cors_origins = ["https://ai-chatbot-project-beta.vercel.app"]
-            logger.warning(f"Using fallback CORS origins: {cors_origins}")
-        else:
-            logger.info(f"Using CORS origins: {cors_origins}")
-        
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=settings.get_cors_origins(),
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-            allow_headers=[
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "Accept-Language",
-                "Content-Language",
-                "Origin",
-                "X-Requested-With",
-                "X-Tenant-ID",  # Widget認証用
-                "X-API-Key",    # Widget認証用
-            ],
-            expose_headers=[
-                "Content-Length",
-                "Content-Type",
-                "X-Request-Id",
-            ],
-        )
+    # パターンA: CORSは全オリジン許可（allow_origins=["*"], allow_credentials=False）
+    # 実際のOrigin制御はアプリケーション層（allowed_widget_originsなど）で実施
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Accept-Language",
+            "Content-Language",
+            "Origin",
+            "X-Requested-With",
+            "X-Tenant-ID",  # Widget認証用
+            "X-API-Key",    # Widget認証用
+        ],
+        expose_headers=[
+            "Content-Length",
+            "Content-Type",
+            "X-Request-Id",
+        ],
+    )
 
     # Trusted host middleware
     # OPTIONSリクエスト（CORSプリフライト）はスキップする必要があるため、
