@@ -16,7 +16,6 @@ import TenantApiKeys from '@/components/settings/TenantApiKeys';
 import TenantLlmModels from '@/components/settings/TenantLlmModels';
 import TenantChunkSettings from '@/components/settings/TenantChunkSettings';
 import TenantWebhookSettings from '@/components/settings/TenantWebhookSettings';
-import { Tenant } from '@/lib/api';
 import { useTenant } from '@/contexts/TenantContext';
 
 export default function SettingsPage() {

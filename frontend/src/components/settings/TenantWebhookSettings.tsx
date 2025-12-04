@@ -97,7 +97,7 @@ export default function TenantWebhookSettings() {
       });
       console.debug('[TenantWebhookSettings] updateTenant レスポンス:', {
         response: updateResponse,
-        responseAllowedOrigins: (updateResponse as any)?.allowed_widget_origins,
+        responseAllowedOrigins: updateResponse?.allowed_widget_origins,
       });
 
       // グローバルなテナント情報を更新して他画面にも反映

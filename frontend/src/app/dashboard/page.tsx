@@ -86,7 +86,6 @@ function DashboardContent() {
   const { user } = useAuth();
   const {
     tenant: tenantInfo,
-    isLoading: tenantLoading,
     reloadTenant,
   } = useTenant();
   const widgetScriptUrl = process.env.NEXT_PUBLIC_WIDGET_CDN_URL || 'https://cdn.rag-chatbot.com/widget.js';

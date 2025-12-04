@@ -56,6 +56,10 @@
 - Propsの型定義は必ず記述
 - エラーバウンダリを実装
 - アクセシビリティを考慮
+- **`any`型の使用を禁止**（ESLintルール`@typescript-eslint/no-explicit-any`に準拠）
+  - 型が不明な場合は`unknown`型を使用し、型ガードで安全に処理
+  - 既存の型定義を確認し、適切な型を使用（例: `Tenant`型のプロパティにアクセスする場合は`Tenant`型として扱う）
+  - 型アサーション（`as any`）は使用禁止。必要に応じて適切な型定義を追加
 
 ### データベース
 - テーブル名は複数形
@@ -166,6 +170,10 @@
 - 同期処理での長時間処理
 - 例外の握りつぶし
 - デバッグ用のprint文（本番環境では削除またはログレベル調整）
+- **TypeScript関連の禁止事項**:
+  - `any`型の使用（`@typescript-eslint/no-explicit-any`ルール違反）
+  - 型アサーション`as any`の使用
+  - 未使用の変数・インポート（`@typescript-eslint/no-unused-vars`ルール違反）
 - **データベース接続関連の禁止事項**:
   - `asyncpg`で`sslmode`パラメータを使用（`ssl=true`を使用）
   - `psycopg2`で`ssl=true`パラメータを使用（`sslmode=require`を使用）
