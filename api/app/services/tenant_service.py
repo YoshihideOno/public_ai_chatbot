@@ -166,6 +166,10 @@ class TenantService:
         
         # ドメイン変更時のバリデーション（重複チェックは削除）
         
+        # exclude_unset=Trueで明示的に設定されたフィールドのみを取得
+        # exclude_none=FalseでNone値も含める（allowed_widget_originsをNoneに設定する場合に対応）
+        update_data = tenant_update.dict(exclude_unset=True, exclude_none=False)
+        
         # Pydantic v2のmodel_fields_setを使って明示的に設定されたフィールドを確認
         # Pydantic v1とv2の互換性を考慮
         if hasattr(tenant_update, 'model_fields_set'):
@@ -177,16 +181,6 @@ class TenantService:
         else:
             # フォールバック: update_dataのキーから推測
             fields_set = set(update_data.keys())
-        
-        # exclude_unset=Trueで明示的に設定されたフィールドのみを取得
-        # exclude_none=FalseでNone値も含める（allowed_widget_originsをNoneに設定する場合に対応）
-        update_data = tenant_update.dict(exclude_unset=True, exclude_none=False)
-        
-        # デバッグログ: 更新データを確認
-        logger.debug(f"テナント更新データ: {update_data}")
-        logger.debug(f"明示的に設定されたフィールド: {fields_set}")
-        if 'allowed_widget_origins' in update_data or 'allowed_widget_origins' in fields_set:
-            logger.info(f"allowed_widget_origins更新リクエスト検出: '{update_data.get('allowed_widget_origins')}' (fields_set: {'allowed_widget_origins' in fields_set})")
         
         # settingsが含まれている場合は、既存の設定とマージ
         if 'settings' in update_data:
@@ -214,7 +208,6 @@ class TenantService:
                 new_value = tenant_update.allowed_widget_origins
             
             tenant.allowed_widget_origins = new_value
-            logger.info(f"allowed_widget_originsを更新: '{tenant.allowed_widget_origins}' (元の値: '{getattr(tenant, 'allowed_widget_origins', None)}')")
         
         # その他のフィールドを更新
         for field, value in update_data.items():
