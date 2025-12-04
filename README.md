@@ -1,3 +1,223 @@
+# RAG AI プラットフォーム（マイクロサービス）
+
+## About
+
+本プラットフォームは、RAG（Retrieval-Augmented Generation）方式のAIチャットボットプラットフォームです。以下の課題を解決します：
+
+### 人手不足解消：24時間365日働く、文句を言わないフロント係・問い合わせ担当
+
+- **24時間365日対応**: 休日・夜間も自動で顧客対応が可能
+- **同時対応数無制限**: 複数の顧客からの問い合わせを同時に処理
+- **一貫した回答品質**: 設定したナレッジベースに基づき、常に正確で一貫した回答を提供
+- **コスト削減**: 人的リソースの削減により、運用コストを大幅に削減
+
+### 専門職向けナレッジ検索：膨大な過去のドキュメントや法改正情報から、必要な情報を探す
+
+- **高速検索**: ベクトル検索技術により、膨大な文書から瞬時に関連情報を抽出
+- **文脈理解**: 会話履歴を考慮した検索により、より関連性の高い情報を提供
+- **複数形式対応**: PDF、DOCX、TXTなど、様々な形式の文書を自動処理
+- **法改正対応**: 定期的に文書を更新することで、最新の法改正情報にも対応
+
+---
+
+## Architecture
+
+本プラットフォームは、マイクロサービス指向、マルチテナント、セキュリティファーストを重視し、フロントエンド（Next.js）とバックエンド（FastAPI）で構成されています。
+
+### システム構成図
+
+```mermaid
+graph TB
+    subgraph "クライアント層"
+        Browser[Webブラウザ]
+        Widget[チャットウィジェット]
+    end
+    
+    subgraph "フロントエンド層"
+        NextJS[Next.js管理画面]
+        WidgetCDN[ウィジェットCDN]
+    end
+    
+    subgraph "API層"
+        FastAPI[FastAPIバックエンド]
+        Auth[認証・認可]
+        API[APIエンドポイント]
+    end
+    
+    subgraph "サービス層"
+        RAGService[RAGサービス]
+        ContentService[コンテンツサービス]
+        TenantService[テナントサービス]
+        UserService[ユーザーサービス]
+    end
+    
+    subgraph "データ層"
+        PostgreSQL[(PostgreSQL + pgvector)]
+        Storage[ファイルストレージ]
+    end
+    
+    subgraph "外部サービス"
+        OpenAI[OpenAI API]
+        Anthropic[Anthropic API]
+        Google[Google Gemini API]
+        Stripe[Stripe]
+    end
+    
+    Browser --> NextJS
+    Widget --> WidgetCDN
+    NextJS --> FastAPI
+    WidgetCDN --> FastAPI
+    FastAPI --> Auth
+    Auth --> API
+    API --> RAGService
+    API --> ContentService
+    API --> TenantService
+    API --> UserService
+    RAGService --> PostgreSQL
+    ContentService --> PostgreSQL
+    ContentService --> Storage
+    TenantService --> PostgreSQL
+    UserService --> PostgreSQL
+    RAGService --> OpenAI
+    RAGService --> Anthropic
+    RAGService --> Google
+    UserService --> Stripe
+```
+
+### RAGパイプライン構成図
+
+```mermaid
+graph TB
+    subgraph "ファイル処理パイプライン"
+        Upload[ファイルアップロード]
+        Extract[テキスト抽出]
+        Chunk[チャンキング<br/>固定サイズ + オーバーラップ]
+        Embed[埋め込み生成<br/>OpenAI text-embedding-3-small]
+        Store[ベクトル保存<br/>PostgreSQL + pgvector]
+    end
+    
+    subgraph "チャット応答生成パイプライン"
+        Query[ユーザークエリ]
+        History[会話履歴取得]
+        QueryGen[検索クエリ生成<br/>LLM使用]
+        QueryEmbed[クエリ埋め込み生成]
+        Search[ベクトル検索<br/>L2距離 + HNSWインデックス]
+        Rerank[再ランキング<br/>会話履歴考慮]
+        Context[コンテキスト構築]
+        LLM[LLM応答生成<br/>OpenAI/Anthropic/Gemini]
+        Response[応答返却]
+    end
+    
+    Upload --> Extract
+    Extract --> Chunk
+    Chunk --> Embed
+    Embed --> Store
+    
+    Query --> History
+    History --> QueryGen
+    QueryGen --> QueryEmbed
+    QueryEmbed --> Search
+    Store -.-> Search
+    Search --> Rerank
+    Rerank --> Context
+    Context --> LLM
+    LLM --> Response
+```
+
+---
+
+## Features
+
+### RAGの工夫点（検索精度の向上策）
+
+本プラットフォームでは、以下の工夫により、高精度な検索と応答生成を実現しています：
+
+#### 1. 会話履歴を考慮した検索クエリ生成
+
+- **問題**: ユーザーの質問が短い場合や、前の会話の文脈が必要な場合、単純なベクトル検索では関連性の高い文書を見つけられない
+- **解決策**: 会話履歴を考慮して、LLMで検索に適したクエリを自動生成
+- **効果**: より関連性の高い文書を検索可能
+
+```python
+# 会話履歴を考慮した検索クエリ生成
+search_query = await self._generate_search_query_with_history(
+    current_query=request.query,
+    conversation_history=conversation_history,
+    model=model,
+    tenant_id=tenant_id
+)
+```
+
+#### 2. 会話履歴を考慮した再ランキング
+
+- **問題**: ベクトル検索の結果が、会話の文脈と必ずしも一致しない場合がある
+- **解決策**: ベクトル検索の結果を、会話履歴を考慮してLLMで再評価・再ランキング
+- **効果**: 会話の流れに沿った、より関連性の高い文書を優先的に使用
+
+```python
+# 会話履歴を考慮した再ランキング
+reranked_results = await self._rerank_search_results_with_history(
+    chunk_results=chunk_results,
+    chunks_dict=chunk_dict,
+    conversation_history=conversation_history,
+    current_query=request.query,
+    model=model,
+    tenant_id=tenant_id
+)
+```
+
+#### 3. チャンキング戦略の最適化
+
+- **固定サイズチャンキング + オーバーラップ**: デフォルトで1024文字、200文字のオーバーラップ
+- **文脈保持**: オーバーラップにより、チャンク間の文脈を保持
+- **メタデータ付与**: 各チャンクにファイル名、チャンクインデックスなどのメタデータを付与
+
+#### 4. 高速ベクトル検索
+
+- **HNSWインデックス**: PostgreSQL + pgvectorのHNSWインデックスにより、高速な類似度検索を実現
+- **L2距離（ユークリッド距離）**: ベクトル間の距離を計算し、類似度の高いチャンクを取得
+- **テナント分離**: テナント単位でデータを分離し、セキュリティとパフォーマンスを両立
+
+#### 5. マルチプロバイダー対応
+
+- **埋め込みモデル**: OpenAI `text-embedding-3-small`（デフォルト）、`text-embedding-ada-002`
+- **LLM**: OpenAI GPT-4/GPT-3.5、Anthropic Claude、Google Gemini
+- **テナント単位での設定**: 各テナントが使用するモデルとAPIキーを個別に設定可能
+
+#### 6. エラーハンドリングとリトライ
+
+- **埋め込み生成のリトライ**: 最大3回のリトライにより、一時的なAPIエラーに対応
+- **フォールバック処理**: 検索クエリ生成や再ランキングが失敗した場合、元のクエリや検索結果を使用
+
+#### 7. 使用量・コスト管理
+
+- **トークン数記録**: 埋め込み生成とLLM応答生成のトークン数を記録
+- **コスト計算**: プロバイダー・モデルごとの単価に基づいてコストを自動計算
+- **使用量統計**: テナント単位で使用量を集計・可視化
+
+---
+
+## Demo
+
+### デモ環境
+
+- **URL**: [デモURLを追加してください]
+- **ステータス**: 準備中
+
+### スクリーンショット
+
+<!-- スクリーンショットを追加してください -->
+![ダッシュボード](./docs/screenshots/dashboard.png)
+![チャット画面](./docs/screenshots/chat.png)
+![コンテンツ管理](./docs/screenshots/contents.png)
+
+### デモ動画
+
+<!-- GIF動画を追加してください -->
+![デモ動画](./docs/demo/demo.gif)
+
+---
+
 ## RAG AI プラットフォーム（マイクロサービス）
 
 本リポジトリは、RAG（Retrieval-Augmented Generation）方式のAIチャットボットプラットフォームです。マイクロサービス指向、マルチテナント、セキュリティファーストを重視し、フロントエンド（Next.js）とバックエンド（FastAPI）で構成されています。
