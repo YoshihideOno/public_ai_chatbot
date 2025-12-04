@@ -37,6 +37,7 @@ export default function TenantWebhookSettings() {
       // テナント情報がまだない場合はデフォルトtrue（従来挙動を維持）
       setEnableNotification(true);
       setWidgetOrigins('');
+      console.debug('[TenantWebhookSettings] テナント情報が未取得のためデフォルト値を設定');
       return;
     }
     const settings = tenant.settings || {};
@@ -46,7 +47,13 @@ export default function TenantWebhookSettings() {
     // allowed_widget_origins はCSV形式で保存されている前提
     // TenantContextの型に含まれていない可能性があるため、安全にアクセス
     const anyTenant = tenant as typeof tenant & { allowed_widget_origins?: string | null };
-    setWidgetOrigins(anyTenant.allowed_widget_origins || '');
+    const origins = anyTenant.allowed_widget_origins || '';
+    console.debug('[TenantWebhookSettings] テナント情報を読み込み:', {
+      tenantId: tenant.id,
+      allowed_widget_origins: origins,
+      enable_webhook: settings.enable_webhook,
+    });
+    setWidgetOrigins(origins);
   }, [tenant]);
 
   const onSave = useCallback(async () => {
@@ -59,24 +66,48 @@ export default function TenantWebhookSettings() {
       setError(null);
       setSuccess(null);
 
+      console.debug('[TenantWebhookSettings] 保存開始:', {
+        tenantId,
+        enableNotification,
+        widgetOrigins,
+        widgetOriginsLength: widgetOrigins.length,
+      });
+
       // コンテンツ処理完了通知の設定を更新
+      console.debug('[TenantWebhookSettings] updateTenantSettings 呼び出し:', {
+        enable_webhook: enableNotification,
+      });
       await apiClient.updateTenantSettings(tenantId, {
         enable_webhook: enableNotification,
       });
+      console.debug('[TenantWebhookSettings] updateTenantSettings 完了');
 
       // 設置ドメイン（allowed_widget_origins）を更新
       // 空文字列の場合はnullに変換、それ以外はトリムして送信
       const trimmedOrigins = widgetOrigins.trim();
-      await apiClient.updateTenant(tenantId, {
-        allowed_widget_origins: trimmedOrigins || null,
+      const originsToSend = trimmedOrigins || null;
+      console.debug('[TenantWebhookSettings] updateTenant 呼び出し:', {
+        allowed_widget_origins: originsToSend,
+        trimmedOrigins,
+        isNull: originsToSend === null,
+        isEmpty: originsToSend === '',
+      });
+      const updateResponse = await apiClient.updateTenant(tenantId, {
+        allowed_widget_origins: originsToSend,
+      });
+      console.debug('[TenantWebhookSettings] updateTenant レスポンス:', {
+        response: updateResponse,
+        responseAllowedOrigins: (updateResponse as any)?.allowed_widget_origins,
       });
 
       // グローバルなテナント情報を更新して他画面にも反映
+      console.debug('[TenantWebhookSettings] reloadTenant 呼び出し');
       await reloadTenant();
+      console.debug('[TenantWebhookSettings] 保存完了');
       setSuccess("設定を保存しました");
       setShowSuccessDialog(true);
     } catch (error: unknown) {
-      console.error('Failed to save webhook settings', error);
+      console.error('[TenantWebhookSettings] 保存エラー:', error);
       const message = error instanceof Error ? error.message : "設定の保存に失敗しました";
       setError(message);
     } finally {

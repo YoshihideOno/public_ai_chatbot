@@ -115,6 +115,15 @@ async def update_tenant(
     db: AsyncSession = Depends(get_db)
 ):
     """テナント更新"""
+    from app.utils.logging import logger
+    
+    # デバッグログ: リクエストデータを出力
+    logger.debug(
+        f"[update_tenant] リクエスト受信: tenant_id={tenant_id}, "
+        f"update_data={tenant_update.model_dump() if hasattr(tenant_update, 'model_dump') else tenant_update.dict()}, "
+        f"allowed_widget_origins={getattr(tenant_update, 'allowed_widget_origins', 'N/A')}"
+    )
+    
     tenant_service = TenantService(db)
     
     # アクセス権限チェック
@@ -127,6 +136,13 @@ async def update_tenant(
         tenant = await tenant_service.update_tenant(tenant_id, tenant_update)
         if not tenant:
             raise TenantNotFoundError()
+        
+        # デバッグログ: 更新後のデータを出力
+        logger.debug(
+            f"[update_tenant] 更新完了: tenant_id={tenant_id}, "
+            f"allowed_widget_origins={tenant.allowed_widget_origins}, "
+            f"type={type(tenant.allowed_widget_origins)}"
+        )
         
         BusinessLogger.log_user_action(
             str(current_user.id),

@@ -160,15 +160,29 @@ class TenantService:
 
     async def update_tenant(self, tenant_id: str, tenant_update: TenantUpdate) -> Optional[Tenant]:
         """テナント更新"""
+        from app.utils.logging import logger
+        
         tenant = await self.get_by_id(tenant_id)
         if not tenant:
             return None
+        
+        # デバッグログ: 更新前の状態
+        logger.debug(
+            f"[TenantService.update_tenant] 更新開始: tenant_id={tenant_id}, "
+            f"現在のallowed_widget_origins={tenant.allowed_widget_origins}, "
+            f"type={type(tenant.allowed_widget_origins)}"
+        )
         
         # ドメイン変更時のバリデーション（重複チェックは削除）
         
         # exclude_unset=Trueで明示的に設定されたフィールドのみを取得
         # exclude_none=FalseでNone値も含める（allowed_widget_originsをNoneに設定する場合に対応）
         update_data = tenant_update.dict(exclude_unset=True, exclude_none=False)
+        
+        logger.debug(
+            f"[TenantService.update_tenant] update_data: {update_data}, "
+            f"allowed_widget_origins in update_data: {'allowed_widget_origins' in update_data}"
+        )
         
         # Pydantic v2のmodel_fields_setを使って明示的に設定されたフィールドを確認
         # Pydantic v1とv2の互換性を考慮
@@ -181,6 +195,11 @@ class TenantService:
         else:
             # フォールバック: update_dataのキーから推測
             fields_set = set(update_data.keys())
+        
+        logger.debug(
+            f"[TenantService.update_tenant] fields_set: {fields_set}, "
+            f"allowed_widget_origins in fields_set: {'allowed_widget_origins' in fields_set}"
+        )
         
         # settingsが含まれている場合は、既存の設定とマージ
         if 'settings' in update_data:
@@ -207,7 +226,23 @@ class TenantService:
             if 'allowed_widget_origins' in fields_set and 'allowed_widget_origins' not in update_data:
                 new_value = tenant_update.allowed_widget_origins
             
+            logger.debug(
+                f"[TenantService.update_tenant] allowed_widget_origins更新: "
+                f"new_value={new_value}, type={type(new_value)}, "
+                f"is_none={new_value is None}, is_empty_string={new_value == ''}"
+            )
+            
             tenant.allowed_widget_origins = new_value
+            
+            logger.debug(
+                f"[TenantService.update_tenant] tenant.allowed_widget_origins設定後: "
+                f"{tenant.allowed_widget_origins}, type={type(tenant.allowed_widget_origins)}"
+            )
+        else:
+            logger.debug(
+                f"[TenantService.update_tenant] allowed_widget_originsは更新対象外 "
+                f"(fields_setに含まれていない、かつupdate_dataにも含まれていない)"
+            )
         
         # その他のフィールドを更新
         for field, value in update_data.items():
@@ -215,8 +250,20 @@ class TenantService:
         
         tenant.updated_at = DateTimeUtils.now()
         
+        logger.debug(
+            f"[TenantService.update_tenant] コミット前: "
+            f"tenant.allowed_widget_origins={tenant.allowed_widget_origins}, "
+            f"type={type(tenant.allowed_widget_origins)}"
+        )
+        
         await self.db.commit()
         await self.db.refresh(tenant)
+        
+        logger.debug(
+            f"[TenantService.update_tenant] コミット・リフレッシュ後: "
+            f"tenant.allowed_widget_origins={tenant.allowed_widget_origins}, "
+            f"type={type(tenant.allowed_widget_origins)}"
+        )
         
         BusinessLogger.log_tenant_action(
             tenant_id,
