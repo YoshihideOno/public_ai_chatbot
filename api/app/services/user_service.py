@@ -87,9 +87,11 @@ class UserService:
             user = result.scalar_one_or_none()
             
             if user:
-                logger.info(f"ユーザー取得成功: ID {user_id}")
+                # ユーザー取得成功はDEBUGレベル（通常の認証フローでは不要なログ）
+                logger.debug(f"ユーザー取得成功: ID {user_id}")
             else:
-                logger.info(f"ユーザー未発見: ID {user_id}")
+                # ユーザー未発見はWARNINGレベル（異常系のため）
+                logger.warning(f"ユーザー未発見: ID {user_id}")
                 
             return user
         except Exception as e:

@@ -69,6 +69,11 @@
   - `server_default`を適切に設定（特に`created_at`、`updated_at`など）
   - `NOT NULL`制約があるカラムには必ずデフォルト値を設定
   - モデル定義とマイグレーションの差分を`alembic check`で定期的に確認
+- **Alembicマイグレーションの管理**:
+  - 新しいマイグレーションを作成する際は、既存のheadリビジョンを確認（`alembic heads`）
+  - 複数のheadが存在する場合は、mergeマイグレーションを作成して統合
+  - `down_revision`は最新の統合済みheadを指定（古いリビジョンを直接参照しない）
+  - マイグレーション履歴は常に1つのheadに統合されている状態を維持
 - **データベース接続文字列の扱い**:
   - `asyncpg`（非同期）と`psycopg2`（同期）でSSLパラメータの形式が異なる
   - `asyncpg`: `ssl=true`を使用（`sslmode`パラメータは理解しない）
@@ -119,6 +124,11 @@
 - ロールバック戦略
 
 ### CI/CD (GitHub Actions) ベストプラクティス
+- **変更前の必須チェック**:
+  - 設定ファイル（JSON、YAML、INI等）を変更する場合は、必ず構文チェックを実施
+  - JSONファイル: `python3 -m json.tool <file>` または `jq . <file>` で検証
+  - YAMLファイル: `yamllint` または `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` で検証
+  - デプロイに8分以上かかるため、ケアレスミス（構文エラー、型エラー等）は事前に検出すべき
 - **Vercelデプロイ**:
   - プロジェクトルートから`vercel`コマンドを実行（`cd frontend`は不要）
   - Vercelプロジェクトの`Root Directory`設定と`--cwd`オプションの重複に注意
@@ -133,6 +143,7 @@
     - `Build Context`: プロジェクトルートから見た`api`ディレクトリを指定
     - `Watch Paths`: `/ai_chatbot_app/**`のような古いパスではなく、`api/**`などの実際のパスを設定
     - `railway.json`で`dockerfilePath`と`watchPatterns`を明示的に定義することを推奨
+    - **`railway.json`はJSON形式のため、コメント（`//`や`/* */`）を記述してはいけない**
 - **環境変数管理**:
   - 認証情報は必ずGitHub Secretsに保存
   - 環境ごとに別々のSecretsを設定（`DEMO_*`, `PROD_*`など）
@@ -166,6 +177,8 @@
   - 環境変数のハードコーディング（GitHub Secretsを使用）
   - 書き込み権限を前提としたファイルパス設定（フォールバック処理なし）
   - Railwayの`Dockerfile Path`と`Build Context`の不一致（`api/Dockerfile`と`api`ディレクトリの組み合わせなど）
+  - **JSONファイルにコメントを記述**（JSONはコメントをサポートしていないため、パースエラーが発生する）
+  - **設定ファイルやビルド関連の変更を事前チェックなしでコミット**（デプロイに時間がかかるため、構文エラーは事前に検出すべき）
 
 ## 推奨事項
 - 型安全性の重視
@@ -183,6 +196,10 @@
   - Railwayの`railway.json`で`dockerfilePath`と`watchPatterns`を明示的に定義
   - Dockerfileの`COPY`コマンドはビルドコンテキストを考慮したパスを使用
   - デプロイ前にデバッグ出力を削除またはログレベルに変更
+  - **設定ファイル変更時の推奨事項**:
+    - JSONファイルにコメントが必要な場合は、別途`README.md`や`*.example`ファイルに記載
+    - 設定ファイルを変更したら、必ず構文チェックを実施してからコミット
+    - デプロイに時間がかかるため、構文エラーや型エラーは事前に検出すべき
 
 ## 命名規則
 - ファイル名：snake_case (Python), kebab-case (TypeScript)

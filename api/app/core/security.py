@@ -206,7 +206,8 @@ def verify_token(token: str) -> Dict[str, Any]:
             logger.warning(f"無効なトークンタイプ: {token_type}")
             raise InvalidTokenError()
             
-        logger.info(f"トークン検証成功: タイプ {token_type}")
+        # トークン検証成功はDEBUGレベル（通常の認証フローでは不要なログ）
+        logger.debug(f"トークン検証成功: タイプ {token_type}")
         return payload
     except jwt.ExpiredSignatureError:
         logger.warning("期限切れトークンが検出されました")

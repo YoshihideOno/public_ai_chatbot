@@ -124,6 +124,13 @@ async def update_tenant(
                 raise TenantAccessDeniedError()
     
     try:
+        # デバッグログ: リクエストデータを確認
+        from app.utils.logging import logger
+        update_dict = tenant_update.dict(exclude_unset=True, exclude_none=False)
+        logger.debug(f"テナント更新リクエスト: tenant_id={tenant_id}, update_data={update_dict}")
+        if 'allowed_widget_origins' in update_dict:
+            logger.info(f"allowed_widget_origins更新リクエスト: '{update_dict['allowed_widget_origins']}'")
+        
         tenant = await tenant_service.update_tenant(tenant_id, tenant_update)
         if not tenant:
             raise TenantNotFoundError()

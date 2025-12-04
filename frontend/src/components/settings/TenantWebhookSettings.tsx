@@ -65,8 +65,10 @@ export default function TenantWebhookSettings() {
       });
 
       // 設置ドメイン（allowed_widget_origins）を更新
+      // 空文字列の場合はnullに変換、それ以外はトリムして送信
+      const trimmedOrigins = widgetOrigins.trim();
       await apiClient.updateTenant(tenantId, {
-        allowed_widget_origins: widgetOrigins || null,
+        allowed_widget_origins: trimmedOrigins || null,
       });
 
       // グローバルなテナント情報を更新して他画面にも反映
@@ -80,7 +82,7 @@ export default function TenantWebhookSettings() {
     } finally {
       setIsLoading(false);
     }
-  }, [tenantId, enableNotification, reloadTenant]);
+  }, [tenantId, enableNotification, widgetOrigins, reloadTenant]);
 
   return (
     <div className="space-y-4">
@@ -135,7 +137,7 @@ export default function TenantWebhookSettings() {
           <DialogHeader>
             <DialogTitle>保存完了</DialogTitle>
           </DialogHeader>
-          <div>コンテンツ処理完了通知の設定を保存しました。</div>
+          <div>コンテンツ処理完了通知と設置ドメインの設定を保存しました。</div>
           <DialogFooter>
             <Button onClick={() => setShowSuccessDialog(false)}>閉じる</Button>
           </DialogFooter>

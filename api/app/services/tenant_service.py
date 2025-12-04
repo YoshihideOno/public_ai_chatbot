@@ -166,7 +166,27 @@ class TenantService:
         
         # ドメイン変更時のバリデーション（重複チェックは削除）
         
-        update_data = tenant_update.dict(exclude_unset=True)
+        # Pydantic v2のmodel_fields_setを使って明示的に設定されたフィールドを確認
+        # Pydantic v1とv2の互換性を考慮
+        if hasattr(tenant_update, 'model_fields_set'):
+            # Pydantic v2の場合
+            fields_set = tenant_update.model_fields_set
+        elif hasattr(tenant_update, '__fields_set__'):
+            # Pydantic v1の場合（__fields_set__を使用）
+            fields_set = tenant_update.__fields_set__
+        else:
+            # フォールバック: update_dataのキーから推測
+            fields_set = set(update_data.keys())
+        
+        # exclude_unset=Trueで明示的に設定されたフィールドのみを取得
+        # exclude_none=FalseでNone値も含める（allowed_widget_originsをNoneに設定する場合に対応）
+        update_data = tenant_update.dict(exclude_unset=True, exclude_none=False)
+        
+        # デバッグログ: 更新データを確認
+        logger.debug(f"テナント更新データ: {update_data}")
+        logger.debug(f"明示的に設定されたフィールド: {fields_set}")
+        if 'allowed_widget_origins' in update_data or 'allowed_widget_origins' in fields_set:
+            logger.info(f"allowed_widget_origins更新リクエスト検出: '{update_data.get('allowed_widget_origins')}' (fields_set: {'allowed_widget_origins' in fields_set})")
         
         # settingsが含まれている場合は、既存の設定とマージ
         if 'settings' in update_data:
@@ -183,6 +203,18 @@ class TenantService:
                         if key not in ('default_model', 'embedding_model'):
                             del current_settings[key]
                 tenant.settings = current_settings
+        
+        # allowed_widget_originsを明示的に処理（Pydanticのexclude_unsetの動作に依存せず確実に更新）
+        # fields_setに含まれている場合、またはupdate_dataに含まれている場合は更新
+        if 'allowed_widget_origins' in fields_set or 'allowed_widget_origins' in update_data:
+            # 値が明示的に送られた場合（Noneでも空文字列でも）は更新
+            new_value = update_data.pop('allowed_widget_origins', None)
+            # fields_setに含まれているがupdate_dataに含まれていない場合（None値の場合）も処理
+            if 'allowed_widget_origins' in fields_set and 'allowed_widget_origins' not in update_data:
+                new_value = tenant_update.allowed_widget_origins
+            
+            tenant.allowed_widget_origins = new_value
+            logger.info(f"allowed_widget_originsを更新: '{tenant.allowed_widget_origins}' (元の値: '{getattr(tenant, 'allowed_widget_origins', None)}')")
         
         # その他のフィールドを更新
         for field, value in update_data.items():
