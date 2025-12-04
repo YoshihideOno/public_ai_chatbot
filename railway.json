@@ -3,6 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
+    "root": "api",
     "watchPatterns": [
       "api/**/*.py",
       "api/**/*.txt",
